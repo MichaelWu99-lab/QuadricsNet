@@ -32,8 +32,8 @@ fitting_model_path = "logs/pretrained_models/quadrics_fitting/"
 detection_model_path = "logs/pretrained_models/quadrics_detection/"
 
 # Dataset path
-dataset_path = "demo/demo.h5"
-dataset_path_separately = "demo/"
+dataset_path = "demo_1/demo.h5"
+dataset_path_separately = "demo_1/"
 
 batch_size = 12
 num_epochs = 100
@@ -44,7 +44,7 @@ num_val=0
 num_test=0
 # Be consistent with dection network
 rate_train=0
-rate_val=0.0
+rate_val=0
 rate_test=1
 
 lr = 0.0001

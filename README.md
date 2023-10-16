@@ -18,8 +18,30 @@ QuadricsNet is an end-to-end framework to learn a concise representation with on
 ![s](figures/Qualitative_results.gif)
 
 # Dataset
-The Quadrics dataset is available: Google Drive.
-
+The Quadrics dataset is available: Baiduyun. 
+* The file structure is as follows:
+```
+|-- dataset
+    |-- quadrics_objects
+        |-- train
+            |-- h5_dense
+                |-- 0.h5
+                |-- ...
+            |-- train.h5
+        |-- test
+            |-- h5_dense
+                |-- 0.h5
+                |-- ...
+            |-- test.h5
+    |-- quadrics_segments
+        |-- train
+            |-- plane.h5
+            |-- ...
+        |-- test
+            |-- plane.h5
+            |-- ...
+```
+* Please download this dataset and put in the **data/** folder.
 # Installation
 ```shell
 cd <QuadricsNet_Path>

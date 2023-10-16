@@ -25,7 +25,7 @@ from src.utils import rescale_input_outputs_quadrics_e2e
 import csv
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 np.set_printoptions(precision=3,linewidth=200)  # 设置输出样式
 
@@ -226,9 +226,9 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
     clustered_primitives_batch = np.stack([clustered_primitives_batch[0][i].data.cpu().numpy() for i in clustered_primitives_batch[0]])
     clustered_primitives_gt_batch = np.stack([clustered_primitives_gt_batch[0][i].data.cpu().numpy() for i in clustered_primitives_gt_batch[0]])
 
+    # vislization
     points_clustered_reconstruction_object = []
     points_raw_gt_object = []
-    # vislization
     for shape_index in range(quadrics_gt_batch_scaled.shape[0]):
         
         resolution = 1*1e-2
