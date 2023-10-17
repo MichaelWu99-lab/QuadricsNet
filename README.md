@@ -55,3 +55,14 @@ conda activate QuadricsNet
 ```shell
 python test_e2e_vis.py configs/configs_test/config_e2e.yml
 ```
+
+# Citation
+If you find our work useful, please consider citing our paper:
+```
+@article{quadricsnet,
+  title={QuadricsNet: Learning Concise Representation for Geometric Primitives in Point Clouds},
+  author={Wu, Ji and Yu, Huai and Yang, Wen and Xia, Gui-Song},
+  journal={arXiv preprint arXiv:2309.14211},
+  year={2023}
+}
+```
