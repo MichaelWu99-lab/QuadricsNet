@@ -21,7 +21,7 @@ QuadricsNet is an end-to-end framework to learn a concise representation with on
 The Quadrics dataset is available: [Google Drive](https://drive.google.com/drive/folders/1YRX1pkBt8LSIrlT_iYau_-qr1kMyyr9l?usp=drive_link). 
 * The file structure is as follows:
 ```
-|-- dataset
+|-- data
     |-- quadrics_objects
         |-- train
             |-- h5_dense
