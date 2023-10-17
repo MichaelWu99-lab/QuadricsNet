@@ -1,6 +1,3 @@
-"""
-This file contains utility functions to segment the embedding using clustering algorithms.
-"""
 import numpy as np
 
 random_state = 170
@@ -36,11 +33,7 @@ def cluster(X, number_cluster, bandwidth=None, alg="kmeans"):
 
 
 def cluster_prob(embedding, centers):
-    """
-    Returns cluster probabilities.
-    :param embedding: N x 128, embedding for each point
-    :param centers: C x 128, embedding for centers
-    """
+
     # should of size N x C
     dot_p = np.dot(centers, embedding.transpose()).transpose()
 
@@ -49,22 +42,14 @@ def cluster_prob(embedding, centers):
 
 
 def cluster_prob(embedding, centers, band_width):
-    """
-    Returns cluster probabilities.
-    :param embedding: N x 128, embedding for each point
-    :param centers: C x 128, embedding for centers
-    """
+
     dist = 2 - 2 * centers @ embedding.T
     prob = np.exp(-dist / 2 / (band_width)) / np.sqrt(2 * np.pi * band_width)
     return prob
 
 
 def cluster_prob_mutual(embedding, centers, bandwidth, if_normalize=False):
-    """
-    Returns cluster probabilities.
-    :param embedding: N x 128, embedding for each point
-    :param centers: C x 128, embedding for centers
-    """
+
     # dim: C x N
     dist = np.exp(centers @ embedding.T / bandwidth)
     prob = dist / np.sum(dist, 0, keepdims=True)
@@ -77,49 +62,6 @@ def cluster_prob_mutual(embedding, centers, bandwidth, if_normalize=False):
 
 def dot_product_from_cluster_centers(embedding, centers):
     return centers @ embedding.T
-
-
-def sample_from_collection_of_mesh(Meshes, N=10000):
-    A = []
-    sampled_points = []
-    new_meshes = []
-    for mesh in Meshes:
-        new_mesh = mesh.remove_unreferenced_vertices()
-        if np.array(new_mesh.vertices).shape[0] == 0:
-            continue
-        else:
-            new_meshes.append(new_mesh)
-
-    for mesh in new_meshes:
-        mesh.remove_unreferenced_vertices()
-        vertices = np.array(mesh.vertices)[np.array(mesh.triangles)]
-        v1 = vertices[:, 0]
-        v2 = vertices[:, 1]
-        v3 = vertices[:, 2]
-
-        A.append(np.sum(triangle_area_multi(v1, v2, v3)))
-
-    area = np.sum(A)
-    Points = []
-
-    for index, mesh in enumerate(new_meshes):
-        if np.array(mesh.vertices).shape[0] == 0:
-            continue
-        mesh.remove_unreferenced_vertices()
-        vertices = np.array(mesh.vertices)[np.array(mesh.triangles)]
-        v1 = vertices[:, 0]
-        v2 = vertices[:, 1]
-        v3 = vertices[:, 2]
-        n = int((N * A[index]) // area)
-        if n > 10:
-            # , face_normals=np.array(mesh.triangle_normals)
-            points, normals, _ = sample_mesh(v1, v2, v3, n=n, norms=False)
-            try:
-                Points.append(points)
-            except:
-                pass
-    Points = np.concatenate(Points, 0)
-    return Points.astype(np.float32)
 
 
 def mean_IOU_one_sample(pred, gt, C):
@@ -136,20 +78,6 @@ def mean_IOU_one_sample(pred, gt, C):
 
 
 def SIOU_matched_segments(target, clustered_labels, primitives_pred, primitives, weights,matching):
-    """
-    Computes iou for segmentation performance and primitive type
-    prediction performance.
-    First it computes the matching using hungarian matching
-    between predicted and ground truth labels.
-    Then it computes the iou score, starting from matching pairs
-    coming out from hungarian matching solver. Note that
-    it is assumed that the iou is only computed over matched pairs.
-    That is to say, if any column in the matched pair has zero
-    number of points, that pair is not considered.
-    
-    It also computes the iou for primitive type prediction. In this case
-    iou is computed only over the matched segments.
-    """
 
     primitives_pred_hot = to_one_hot_batch(primitives_pred, 10, weights[0].device.index).float()
 
@@ -165,16 +93,7 @@ def SIOU_matched_segments(target, clustered_labels, primitives_pred, primitives,
 
 
 def mean_IOU_primitive_segment(matching, clustered_labels, labels, pred_prim, gt_prim):
-    """
-    Primitive type IOU, this is calculated over the segment level.
-    First the predicted segments are matched with ground truth segments,
-    then IOU is calculated over these segments.
-    :param matching
-    :param pred_labels: N x 1, pred label id for segments
-    :param gt_labels: N x 1, gt label id for segments
-    :param pred_prim: K x 1, pred primitive type for each of the predicted segments
-    :param gt_prim: N x 1, gt primitive type for each point
-    """
+
     batch_size = labels.shape[0]
     IOU = []
     IOU_prim = []
@@ -223,22 +142,14 @@ def mean_IOU_primitive_segment(matching, clustered_labels, labels, pred_prim, gt
 
 
 def primitive_type_segment(pred, weights):
-    """
-    Returns the primitive type for every segment in the predicted shape.
-    :param pred: N x L
-    :param weights: N x k
-    """
+
     d = np.expand_dims(pred, 2) * np.expand_dims(weights, 1)
     d = np.sum(d, 0)
     return np.argmax(d, 0)
 
 
 def primitive_type_segment_torch(pred, weights):
-    """
-    Returns the primitive type for every segment in the predicted shape.
-    :param pred: N x L
-    :param weights: N x k
-    """
+
     batch_size = pred.shape[0]
     primitive_type = []
     for b in range(batch_size):
@@ -248,22 +159,6 @@ def primitive_type_segment_torch(pred, weights):
         primitive_type.append(primitive_type_batch)
     
     return primitive_type
-
-
-def iou_segmentation(pred, gt):
-    # preprocess the predictions and gt to remove the extras
-    # swap (0, 6, 7) to closed surfaces which is 9
-    # swap 8 to 2
-    gt[gt == 0] = 9
-    gt[gt == 6] = 9
-    gt[gt == 7] = 9
-    gt[gt == 8] = 2
-
-    pred[pred == 0] = 9
-    pred[pred == 6] = 9
-    pred[pred == 7] = 9
-    pred[pred == 8] = 2
-    return mean_IOU_one_sample(pred, gt, 6)
 
 
 def to_one_hot(target, maxx=50, device_id=0):
@@ -292,13 +187,7 @@ def to_one_hot_batch(target, maxx=50, device_id=0):
 
 
 def matching_iou(matching, predicted_labels, labels):
-    """
-    Computes the iou score, starting from matching pairs
-    coming out from hungarian matching solver. Note that
-    it is assumed that iou is only computed over matched pairs.
-    That is to say, if any column in the matched pair has zero
-    number of points, that pair is not considered.
-    """
+
     batch_size = labels.shape[0]
     IOU = []
     new_pred = []

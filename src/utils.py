@@ -42,10 +42,7 @@ def rotation_matrix_a_to_b(A, B):
 
 
 def rescale_input_outputs(scales, points, output, batch_size):
-    """
-    In the case of anisotropic scaling, we need to rescale the tensors
-    to original dimensions to compute the loss and eval metric.
-    """
+
     scales = np.stack(scales, 0).astype(np.float32)
     scales = torch.from_numpy(scales).cuda()
 
@@ -62,10 +59,7 @@ def rescale_input_outputs(scales, points, output, batch_size):
     return scales, points, output
 
 def rescale_input_outputs_quadrics(T_batch, scale_quadrics,quadrics, output,batch_size):
-    """
-    In the case of anisotropic scaling, we need to rescale the tensors
-    to original dimensions to compute the loss and eval metric.
-    """
+
     T_batch = np.stack(T_batch, 0).astype(np.float32)
     T_batch = torch.from_numpy(T_batch).cuda()
     scale_quadrics = torch.from_numpy(scale_quadrics).cuda()
@@ -136,8 +130,6 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
     q_gt = quadrics
     q_pre = output
 
-    # 将向量q转换为矩阵Q，注意其对称性
-    # 消除尺度不确定性，难以求梯度，训练时不进行
     C_pre = C
     if eval:
         if shape in ["sphere","ellipsoid","cylinder","elliptic_cylinder"]:
@@ -154,7 +146,6 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
         
         elif shape in ["plane","cone","elliptic_cone"]:
 
-            # 防止梯度被修改，另开一个变量
             q_gt_ = F.normalize(q_gt,p=2,dim=0)
             q_pre_ = F.normalize(q_pre,p=2,dim=0)
 
@@ -169,7 +160,6 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
 
     elif not eval:
         if shape in ["sphere","ellipsoid","cylinder","elliptic_cylinder"]:
-                # 试验
             Q_gt = torch.tensor([[q_gt[0], q_gt[3], q_gt[4], q_gt[6]],
                                     [q_gt[3], q_gt[1], q_gt[5], q_gt[7]],
                                     [q_gt[4], q_gt[5], q_gt[2], q_gt[8]],
@@ -181,12 +171,11 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
                                     [q_gt[3], q_gt[1], q_gt[5], q_gt[7]],
                                     [q_gt[4], q_gt[5], q_gt[2], q_gt[8]],
                                     [q_gt[6], q_gt[7], q_gt[8], q_gt[9]]]).cuda(q_gt.device)
-            scale_identification_gt = 0 # 便于编程
-            Is_add = 0 # 便于编程
+            scale_identification_gt = 0
+            Is_add = 0
 
         
     ###########################
-    # 分解r，t
     # trans_inv=[R.T, -R.T*t
     #             0  ,  1  ]
     trans_t_ = trans_inv[0:3,3] # -R.T*t
@@ -203,48 +192,38 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
     value_gt_sorted,idx_gt = torch.sort(value_gt[:,0],descending=True)
     Is_gt,Ir_gt,It_gt = quadrics_judgment(value_gt_sorted)
     vector_gt_sorted = vector_gt[:,idx_gt]
-    # 将特征值转换为尺度
     scale_gt_sorted = torch.sqrt(1 / ((Is_gt * value_gt_sorted) + 1e-8))
     scale_gt_sorted = torch.diag_embed(scale_gt_sorted).cuda(q_gt.device)
-    # 特征值对角阵
     value_gt_sorted = torch.diag_embed(value_gt_sorted).cuda(q_gt.device)
 
     ###########################
     # pre eigen
     if not eval:
-        # 训练时候直接用C和tran_3作为特征值和特征向量
         value_pre_sorted,idx_pre = torch.sort(torch.diag(C_pre)[0:3],descending=True)
         vector_pre_sorted = trans_r[:,idx_pre]
 
-        # 将特征值转换为尺度，没有进行abs，害怕影响梯度
         scale_pre_sorted = torch.sqrt(1 / ((Is_gt * value_pre_sorted)+ 1e-8))
     elif eval:
-        # 评估时候分解预测的Q
         E_pre = Q_pre[0:3,0:3]
         value_pre,vector_pre = torch.eig(E_pre, eigenvectors=True)
         value_pre_sorted,idx_pre = torch.sort(value_pre[:,0],descending=True)
         vector_pre_sorted = vector_pre[:,idx_pre]
 
-        # 将特征值转换为尺度，进行abs
         scale_pre_sorted = torch.sqrt(torch.abs(1 / ((Is_gt * value_pre_sorted)+ 1e-8)))
     
     scale_pre_sorted = torch.diag_embed(scale_pre_sorted).cuda(q_gt.device)
-    # 特征值对角阵
     value_pre_sorted = torch.diag_embed(value_pre_sorted).cuda(q_gt.device)
 
     ###########################
-    # -1归一化
     if (shape in ["cone","elliptic_cone"]) and eval:
         if sum(torch.diag(value_gt_sorted) < 0) == 1:
             factor_gt = -value_gt_sorted[value_gt_sorted < 0]
             value_gt_sorted = value_gt_sorted / factor_gt
-            # Q_gt归一化，求ldt的时候需要
             Q_gt = Q_gt / factor_gt
 
         if sum(torch.diag(value_pre_sorted) < 0) == 1:
             factor_pre = -value_pre_sorted[value_pre_sorted < 0]
             value_pre_sorted = value_pre_sorted / factor_pre
-            # trans_t不需要归一化
 
     ###########################
     # ldr
@@ -255,12 +234,6 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
         # sum(((vector_gt x vector_pre) * I_r_gt)^2) / (sum(I_r_gt)*3)
         loss_decomposition_r = torch.sum((torch.matmul(torch.cross(vector_gt_sorted, vector_pre_sorted,dim=0),torch.diag_embed(Ir_gt)) **2))/(torch.sum(Ir_gt)*3)
 
-    # # 过滤掉特征值不在[1e-2,1e2]之间的方向
-    # value_gt_filter = (torch.abs(torch.diag(value_gt_sorted)) <1e2) * torch.tensor([1,1,1]).cuda(Is_gt.device)
-    # value_gt_filter = (torch.abs(torch.diag(value_gt_sorted)) >1e-2) * value_gt_filter
-    # Is_gt = Is_gt * value_gt_filter
-    # It_gt = It_gt * value_gt_filter
-
     ###########################
     # lds
     # sum(((value_gt - value_pre) * I_r_gt)^2) / (sum(I_r_gt))
@@ -269,15 +242,10 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
         loss_decomposition_s = torch.sum(Is_gt)
     else:
         if not eval:
-            # lds计算用特征值，所有非0特征值都用于计算
             loss_decomposition_s = torch.sum(((value_gt_sorted - value_pre_sorted)**2))
-            # 加上对C[3,3]的监督，其本为负值，加上等于相减
-            # plane、cone C[3,3]为0无效，cylinder、sphere C[3,3]有效
             loss_decomposition_s = loss_decomposition_s + ((C_pre[3,3] + scale_identification_gt)) ** 2
-            # Is_add附加，plane、cone为0，cylinder、sphere为1
             loss_decomposition_s = loss_decomposition_s/(torch.count_nonzero(value_gt_sorted)+Is_add)
         elif eval:
-            # lds计算用真实尺度值
             loss_decomposition_s = torch.sum((torch.matmul((scale_gt_sorted - scale_pre_sorted),torch.diag_embed(Is_gt))**2))/torch.sum(Is_gt)
 
     ###########################
@@ -292,37 +260,10 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
 
     return loss_decomposition_r,loss_decomposition_s,loss_decomposition_t
 
-# def quadrics_scale_identification(Q):
-#     eigenvalue_Q,_ = torch.eig(Q,eigenvectors=False)
-#     eigenvalue_Q = eigenvalue_Q[:,0]
-
-#     # 筛选出特征值绝对占比大于1%的特征值
-#     eigenvalue_Q_sum = torch.sum(torch.abs(eigenvalue_Q))
-#     eigenvalue_Q = eigenvalue_Q[torch.where(torch.abs(eigenvalue_Q) > (eigenvalue_Q_sum * 0.01))]
-#     scale_Q = torch.tensor([1]).cuda(Q.device)
-
-#     for i in eigenvalue_Q:
-#         scale_Q = scale_Q * i
-
-#     eigenvalue_E,_ = torch.eig(Q[0:3,0:3],eigenvectors=False)
-#     eigenvalue_E = eigenvalue_E[:,0]
-#     # 筛选出特征值绝对占比大于5%的特征值
-#     eigenvalue_E_sum = torch.sum(torch.abs(eigenvalue_E))
-#     eigenvalue_E = eigenvalue_E[torch.where(torch.abs(eigenvalue_E) > (eigenvalue_E_sum * 0.05))]
-#     scale_E = torch.tensor([1]).cuda(Q.device)
-
-#     for i in eigenvalue_E:
-#         scale_E = scale_E * i
-    
-#     scale_identification = torch.abs(scale_E / scale_Q)
-#     Q = scale_identification * Q
-#     return Q
-
 def quadrics_scale_identification(Q):
     eigenvalue_Q,_ = torch.eig(Q,eigenvectors=False)
     eigenvalue_Q = eigenvalue_Q[:,0]
 
-    # 筛选出特征值绝对占比大于1%的特征值
     eigenvalue_Q_sum = torch.sum(torch.abs(eigenvalue_Q))
     eigenvalue_Q = eigenvalue_Q[torch.where(torch.abs(eigenvalue_Q) > (eigenvalue_Q_sum * 0.001))]
 
@@ -333,7 +274,6 @@ def quadrics_scale_identification(Q):
     eigenvalue_E,_ = torch.eig(Q[0:3,0:3],eigenvectors=False)
     eigenvalue_E = eigenvalue_E[:,0]
 
-    # 筛选出特征值绝对占比大于5%的特征值
     eigenvalue_E_sum = torch.sum(torch.abs(eigenvalue_E))
     eigenvalue_E = eigenvalue_E[torch.where(torch.abs(eigenvalue_E) > (eigenvalue_E_sum * 0.001))]
     scale_E = torch.tensor([1]).cuda(Q.device)
@@ -348,13 +288,11 @@ def quadrics_scale_identification(Q):
 def quadrics_function_distance(output, points):
     q = output
 
-    # 将向量q转换为矩阵Q，注意其对称性
     Q = torch.tensor([[q[0], q[3], q[4], q[6]],
                                 [q[3], q[1], q[5], q[7]],
                                 [q[4], q[5], q[2], q[8]],
                                 [q[6], q[7], q[8], q[9]]]).cuda(device=points.device)
 
-    # 转换为齐次坐标
     append_one = torch.ones(points.size(0), 1).cuda(device=points.device)
     append_one = append_one.cuda(device=points.device)
     points_append = torch.cat((points, append_one), 1)
@@ -370,8 +308,6 @@ def normals_deviation_distance(output,points,normals,quadrics):
     normals_analytical = compute_normals_analytically_torch(points,output)
     loss_normals_deviation = torch.mean(torch.abs(torch.cross(normals_analytical,normals)))
 
-    # normals_analytical = compute_normals_analytically_torch(points,quadrics)
-    # loss_normals_deviation_each_gt = torch.mean(torch.abs(torch.cross(normals_analytical,normals)))
     return loss_normals_deviation
 
 def compute_normals_analytically_torch(points_temp,quadrics_temp):
@@ -392,7 +328,6 @@ def compute_normals_analytically_torch(points_temp,quadrics_temp):
     deta_v = torch.cat((deta_v_0,deta_v_1,deta_v_2),axis=1)
     normlas_temp = torch.squeeze(torch.matmul(deta_v,torch.unsqueeze(quadrics_temp,axis=-1)),2)
 
-    # 单位化
     normlas_temp = torch.nn.functional.normalize(normlas_temp,p=2, dim=1)
 
     return normlas_temp

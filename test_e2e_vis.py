@@ -27,7 +27,7 @@ import csv
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-np.set_printoptions(precision=3,linewidth=200)  # 设置输出样式
+np.set_printoptions(precision=3,linewidth=200)
 
 config = Config(sys.argv[1])
 
@@ -70,7 +70,7 @@ model = PrimitivesEmbeddingDGCNGn(
 )
 
 # single GPU
-# quadrics_detection模型
+# quadrics_detection
 model.load_state_dict(torch.load(config.detection_model_path+"if_normals_{}/".format(int(config.if_detection_normals)) + "train_loss_singleGPU.pth"))
 # model.load_state_dict(torch.load("logs/trained_models/{}/train_loss_singleGPU.pth".format(model_name)))
 
@@ -168,7 +168,7 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
                 if_fitting_normals = config.if_fitting_normals
             )
 
-        h5_gt_separately_dir = config.dataset_path_separately + "h5/"
+        h5_gt_separately_dir = config.dataset_path_separately + "h5_dense/"
         h5_gt_separately = os.listdir(h5_gt_separately_dir)
         # Sort in descending order for the same sequence number and name
         h5_gt_separately.sort(key = lambda x: int(x[:-3]))

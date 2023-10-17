@@ -9,7 +9,6 @@ from src.fitting_optimization import FittingModule
 import numpy as np
 
 from src.fitting_utils import (
-    weights_normalize,
     to_one_hot,
     match,
 )

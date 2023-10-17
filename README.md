@@ -18,7 +18,7 @@ QuadricsNet is an end-to-end framework to learn a concise representation with on
 ![s](figures/Qualitative_results.gif)
 
 # Dataset
-The Quadrics dataset is available: Baiduyun. 
+The Quadrics dataset is available: Baidu Drive. 
 * The file structure is as follows:
 ```
 |-- dataset
