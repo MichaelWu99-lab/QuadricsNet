@@ -32,8 +32,8 @@ fitting_model_path = "logs/pretrained_models/quadrics_fitting/"
 detection_model_path = "logs/pretrained_models/quadrics_detection/"
 
 # Dataset path
-dataset_path = "demo_1/demo.h5"
-dataset_path_separately = "demo_1/"
+dataset_path = "demo/demo.h5"
+dataset_path_separately = "demo/"
 
 batch_size = 12
 num_epochs = 100

@@ -220,7 +220,6 @@ class Dataset:
     def get_test(self, d_mean=False, d_scale=False,noise=0):
         while True:
             for batch_id in range(self.test_points.shape[0] // self.batch_size):
-                # batch_id = 2
                 Points = []
                 Points_ = []
                 Quadrics = []
