@@ -18,7 +18,7 @@ from src.loss import (
     EmbeddingLoss,
     primitive_loss,
 )
-from src.visualization.utils_vis import utils_vis
+from src.utils_vis import utils_vis
 from torch.utils.data import DataLoader
 import torch
 from src.utils import rescale_input_outputs_quadrics_e2e
