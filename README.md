@@ -4,7 +4,7 @@
 
 This repository contains the official PyTorch implementation of the [QuadricsNet](https://arxiv.org/pdf/2309.14211.pdf) paper.
 
-[Paper](https://arxiv.org/pdf/2309.14211.pdf) | [Video](https://www.youtube.com/watch?v=0EFhMufuUSI) | [Data]()
+[Paper](https://arxiv.org/pdf/2309.14211.pdf) | [Video](https://www.youtube.com/watch?v=0EFhMufuUSI) | [Data](https://drive.google.com/drive/folders/1YRX1pkBt8LSIrlT_iYau_-qr1kMyyr9l?usp=drive_link)
 
 # Introduction
 QuadricsNet is an end-to-end framework to learn a concise representation with only 10 parameters for diverse geometric primitives in 3D point clouds. Experiments of primitive parsing on the collected dataset and structure mapping on real-world scenes demonstrate that the quadrics representation is effective and the QuadricsNet framework is robust.
@@ -18,7 +18,7 @@ QuadricsNet is an end-to-end framework to learn a concise representation with on
 ![s](figures/Qualitative_results.gif)
 
 # Dataset
-The Quadrics dataset is available: Baidu Drive. 
+The Quadrics dataset is available: [Google Drive](https://drive.google.com/drive/folders/1YRX1pkBt8LSIrlT_iYau_-qr1kMyyr9l?usp=drive_link). 
 * The file structure is as follows:
 ```
 |-- dataset
