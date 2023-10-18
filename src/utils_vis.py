@@ -1,3 +1,4 @@
+import re
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from sklearn.decomposition import PCA
@@ -214,7 +215,28 @@ class utils_vis:
                 continue
         points_trim = np.array(points_trim)
         return points_trim
+    
+    def down_sample(self,points, num_sample=10000):
+        if points.shape[0] > num_sample:
+            choice = np.random.choice(points.shape[0], num_sample, replace=False)
+            points_sample = points[choice, :]
+        else:
+            points_sample = points
+        return points_sample
 
-    def guard_sqrt(self,x, minimum=1e-5):
-        x = np.clip(x, a_min=minimum, a_max=None)
-        return np.sqrt(x)
+    def res_efficient(self,points_reconstruction,points_gt):
+        points_reconstruction_temp = self.down_sample(points_reconstruction)
+        points_gt_temp = self.down_sample(points_gt)
+
+        points_reconstruction_temp = np.expand_dims(points_reconstruction_temp,1)
+        points_gt_temp = np.expand_dims(points_gt_temp,0)
+        # diff: [num_reconstruction_points, num_gt_points, 3]
+        diff = points_reconstruction_temp - points_gt_temp
+        # diff: [num_reconstruction_points, num_gt_points]
+        diff = np.sqrt(np.sum(diff ** 2,2))
+
+        # diff = np.sqrt(np.sum(diff ** 2,2))
+        distance_0 = np.mean(np.min(diff,1))
+        distance_1 = np.mean(np.min(diff,0))
+        res = np.mean([distance_0,distance_1])
+        return res

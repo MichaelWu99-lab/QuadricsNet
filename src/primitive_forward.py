@@ -177,9 +177,9 @@ def fit_one_shape_torch(data, fitter, weights, eval=False,if_fitting_normals=[0,
             points_input = points
             normals_input = normals
 
-            # _,index = remove_outliers(points.data.cpu().numpy())
-            # points_input = points[index]
-            # normals_input = normals[index]
+            _,index = remove_outliers(points.data.cpu().numpy())
+            points_input = points[index]
+            normals_input = normals[index]
 
             num_points_input = 1100
             points_input, normals_input = up_sample_all_in_range(points_input, normals_input, num_points_input)

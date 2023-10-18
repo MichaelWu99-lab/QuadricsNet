@@ -232,7 +232,6 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
     for shape_index in range(quadrics_gt_batch_scaled.shape[0]):
         
         resolution = 1*1e-2
-        thres = 0.01
 
         T_shape = T_batch_sample[shape_index]
         q_pre = quadrics_pre_batch_scaled[shape_index]
@@ -292,17 +291,7 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
             points_clustered_reconstruction_object_save = np.concatenate((points_clustered_reconstruction_object_save,semgent),0)
             points_raw_gt_object_save = np.concatenate((points_raw_gt_object_save,points_raw_gt_object[semgent_index]),0)
 
-    points_reconstruction_temp = np.expand_dims(points_clustered_reconstruction_object_save,1)
-    points_gt_temp = np.expand_dims(points_raw_gt_object_save,0)
-    # diff: [num_reconstruction_points, num_gt_points, 3]
-    diff = points_reconstruction_temp - points_gt_temp
-    # diff: [num_reconstruction_points, num_gt_points]
-    diff = utils_vis.guard_sqrt(np.sum(diff ** 2,2))
-
-    # diff = np.sqrt(np.sum(diff ** 2,2))
-    distance_0 = np.mean(np.min(diff,1))
-    distance_1 = np.mean(np.min(diff,0))
-    distance = np.mean([distance_0,distance_1])
+    res = utils_vis.res_efficient(points_clustered_reconstruction_object_save,points_raw_gt_object_save)
 
     pcd_reconstruction = o3d.geometry.PointCloud()
     pcd_reconstruction.points = o3d.utility.Vector3dVector(points_clustered_reconstruction_object_save)
@@ -313,6 +302,6 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
     o3d.io.write_point_cloud(save_result_dir_object+"/gt.ply", pcd_gt)
 
     print("Sample: {}, seg_iou: {:.4}, type_iou: {:.4}, res: {:.4}".format(
-            test_b_id,seg_iou.item(),type_iou.item(),distance.item()
+            test_b_id,seg_iou.item(),type_iou.item(),res.item()
         )
     )
