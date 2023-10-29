@@ -61,7 +61,7 @@ class utils_vis:
         return points_reconstruction
 
     def quadrics2points_by_matlab(self,q, mesh_size, res, error):
-        ## generate points_reconstruction from quadrics by matlab function
+        # generate points_reconstruction from quadrics by matlab function
         np.savetxt('temp.txt', np.hstack((q,mesh_size.reshape(-1),res,error)))
         quadrics2points_matlab = quadrics2points.initialize()
         points_reconstruction = np.array(quadrics2points_matlab.quadrics2points('temp.txt')['vertices'])
@@ -150,12 +150,6 @@ class utils_vis:
         min_projection_gt = np.min(points_gt @ axis_projection, axis=0)
 
         q_pre = self.Q2quadrics(Q_pre)
-
-        # ## generate points_reconstruction from quadrics by matlab function
-        # np.savetxt('temp.txt', np.hstack((q_pre,mesh_size.reshape(-1),res,error)))
-        # quadrics2points_matlab = quadrics2points.initialize()
-        # points_reconstruction = np.array(quadrics2points_matlab.quadrics2points('temp.txt')['vertices'])
-        # quadrics2points_matlab.terminate()
 
         points_reconstruction = self.quadrics2points_by_matlab(q_pre, mesh_size, res, error)
 
