@@ -1,0 +1,9 @@
+LIBRARY quadrics2points
+EXPORTS
+quadrics2pointsInitialize
+quadrics2pointsInitializeWithHandlers
+quadrics2pointsTerminate
+quadrics2pointsPrintStackTrace
+mlxQuadrics2points
+mlfQuadrics2points
+

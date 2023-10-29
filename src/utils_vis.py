@@ -3,7 +3,14 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from sklearn.decomposition import PCA
 from skimage import measure
+import sys
 
+try:
+    import quadrics2points
+except:
+    print("Please add MATLAB runtime path to the environment variable!")
+    sys.exit()
+import os
 
 class utils_vis:
     def __init__(self):
@@ -22,7 +29,6 @@ class utils_vis:
         return bound_box_size
 
     def quadrics2Q(self,q):
-        Q = np.zeros((4, 4))
         Q = np.array([[q[0], q[3], q[4],q[6]],
                     [q[3], q[1], q[5], q[7]],
                     [q[4], q[5], q[2], q[8]],
@@ -30,7 +36,6 @@ class utils_vis:
         return Q
 
     def Q2quadrics(self,Q):
-        q = np.zeros(10)
         q = np.array([Q[0, 0],Q[1, 1],Q[2, 2],Q[0, 1],Q[0, 2],Q[1, 2],Q[0, 3],Q[1, 3],Q[2, 3],Q[3, 3]])
         return q
 
@@ -47,20 +52,23 @@ class utils_vis:
         X, Y, Z = np.meshgrid(x, y, z)
         I = np.ones(X.shape)
         
-        F = q[0] * X**2 + q[1] * Y**2 + q[2] * Z**2 + \
-            q[3] * 2 * X * Y + q[4] * 2 * X * Z + q[5] * 2 * Y * Z + \
-            q[6] * 2 * X + q[7] * 2 * Y + q[8] * 2 * Z + q[9] * I
-        
-        # interpolator = RegularGridInterpolator((x, y, z), F)
-        # points = np.stack((X.flatten(), Y.flatten(), Z.flatten()), axis=1)
-        # values = interpolator(points)
-        # points_reconstruction = points[np.abs(values) <= error]
-
         F = (q[0] * X**2 + q[1] * Y**2 + q[2] * Z**2 + \
             q[3] * 2 * X * Y + q[4] * 2 * X * Z + q[5] * 2 * Y * Z + \
             q[6] * 2 * X + q[7] * 2 * Y + q[8] * 2 * Z + q[9] * I <= error)
         points_reconstruction,_,_,_ = measure.marching_cubes_lewiner(F)
         points_reconstruction = points_reconstruction * res+np.array([xlow,ylow,zlow])
+
+        return points_reconstruction
+
+    def quadrics2points_by_matlab(self,q, mesh_size, res, error):
+        ## generate points_reconstruction from quadrics by matlab function
+        np.savetxt('temp.txt', np.hstack((q,mesh_size.reshape(-1),res,error)))
+        quadrics2points_matlab = quadrics2points.initialize()
+        points_reconstruction = np.array(quadrics2points_matlab.quadrics2points('temp.txt')['vertices'])
+        quadrics2points_matlab.terminate()
+        
+        if os.path.exists('temp.txt'):
+            os.remove('temp.txt')
 
         return points_reconstruction
 
@@ -74,7 +82,9 @@ class utils_vis:
         vector_pre = vector_pre[:, idx_pre[0]]
         
         q_pre = self.Q2quadrics(Q_pre)
+
         points_reconstruction = self.quadrics2points(q_pre, mesh_size, res, error)
+
         points_reconstruction_temp = np.expand_dims(points_reconstruction,1)
         points_gt_temp = np.expand_dims(points_gt,0)
         diff = points_reconstruction_temp - points_gt_temp
@@ -140,13 +150,31 @@ class utils_vis:
         min_projection_gt = np.min(points_gt @ axis_projection, axis=0)
 
         q_pre = self.Q2quadrics(Q_pre)
-        points_reconstruction = self.quadrics2points(q_pre, mesh_size, res, error)
+
+        # ## generate points_reconstruction from quadrics by matlab function
+        # np.savetxt('temp.txt', np.hstack((q_pre,mesh_size.reshape(-1),res,error)))
+        # quadrics2points_matlab = quadrics2points.initialize()
+        # points_reconstruction = np.array(quadrics2points_matlab.quadrics2points('temp.txt')['vertices'])
+        # quadrics2points_matlab.terminate()
+
+        points_reconstruction = self.quadrics2points_by_matlab(q_pre, mesh_size, res, error)
 
         if if_trim == "0":
             points_trim = points_reconstruction
         else:
             margin_value = np.abs(max_projection_gt) * margin
             points_trim = self.trim(points_reconstruction, max_projection_gt + margin_value, min_projection_gt - margin_value, axis_projection)
+
+        points_trim_temp = np.expand_dims(points_trim,1)
+        points_gt_temp = np.expand_dims(points_gt,0)
+        # diff: [points_trim_temp, num_gt_points, 3]
+        diff = points_trim_temp - points_gt_temp
+        # diff: [points_trim_temp, num_gt_points]
+        diff = np.sum(diff ** 2,2)
+
+        trim_index = np.argmin(diff,0)
+        points_trim = points_trim[trim_index]
+
         return points_trim
 
     def judgment(self,d):
@@ -240,3 +268,4 @@ class utils_vis:
         distance_1 = np.mean(np.min(diff,0))
         res = np.mean([distance_0,distance_1])
         return res
+

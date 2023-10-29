@@ -25,7 +25,7 @@ from src.utils import rescale_input_outputs_quadrics_e2e
 import csv
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 np.set_printoptions(precision=3,linewidth=200)
 
@@ -104,9 +104,6 @@ else:
 lamb_0 = [config.lamb_0_0, config.lamb_0_1, config.lamb_0_2, config.lamb_0_3,config.lamb_0_4,config.lamb_0_5,config.lamb_0_6]
 lamb_1 = config.lamb_1
     
-test_iou = []
-test_seg_iou = []
-
 # clear results dir
 results_dir = "logs/results_vis/{}".format(model_name)
 if os.path.exists(results_dir):
@@ -118,6 +115,10 @@ else:
 torch.cuda.empty_cache()
 model.eval()
 utils_vis = utils_vis()
+
+seg_iou_all = []
+type_iou_all = []
+res_all = []
 
 for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
 
@@ -179,7 +180,7 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
 
         every_clustered_num = []
         object_clustered_points = []
-        object_gt_raw_points = []
+        object_gt_dense_points = []
         invalid_points_num = False
         clustered_points_input_batch = [clustered_points_input_batch[0][i] for i in clustered_points_input_batch[0]]
         clustered_points_batch = [clustered_points_batch[0][i] for i in clustered_points_batch[0]]
@@ -196,7 +197,7 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
             every_clustered_num.append(clustered_points_batch[i].shape[0])
 
             # Save the corresponding label's gt point cloud, according to the clustering results
-            object_gt_raw_points.append(points_gt_separately[labels_gt_separately==[clustered_labels_gt_batch[0][i] for i in clustered_labels_gt_batch[0]][i]].reshape(-1,3))
+            object_gt_dense_points.append(points_gt_separately[labels_gt_separately==[clustered_labels_gt_batch[0][i] for i in clustered_labels_gt_batch[0]][i]].reshape(-1,3))
 
         # When the number of point clouds in the shape is too small or there is only one cluster, skip
         if invalid_points_num or i==0:
@@ -228,7 +229,6 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
 
     # vislization
     points_clustered_reconstruction_object = []
-    points_raw_gt_object = []
     for shape_index in range(quadrics_gt_batch_scaled.shape[0]):
         
         resolution = 1*1e-2
@@ -241,34 +241,38 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
         points_shape_clusterd = object_clustered_points[shape_index]
         points_shape_clusterd_scaled = np.matmul(T_shape,np.concatenate((points_shape_clusterd,np.ones((points_shape_clusterd.shape[0],1))),1).transpose()).transpose()[:,0:3]
 
-        points_shape_gt_raw = object_gt_raw_points[shape_index]
+        points_shape_gt_dense = object_gt_dense_points[shape_index]
         T_shape_object = np.matmul(T_shape, T_object)
-        points_shape_gt_raw_scaled = np.matmul(T_shape_object,np.concatenate((points_shape_gt_raw,np.ones((points_shape_gt_raw.shape[0],1))),1).transpose()).transpose()[:,0:3]
+        points_shape_gt_dense_scaled = np.matmul(T_shape_object,np.concatenate((points_shape_gt_dense,np.ones((points_shape_gt_dense.shape[0],1))),1).transpose()).transpose()[:,0:3]
+
+        points_object_gt = points_raw[0]
+        points_object_gt = np.matmul(T_object,np.concatenate((points_object_gt,np.ones((points_object_gt.shape[0],1))),1).transpose()).transpose()[:,0:3]
+
 
         if_trim="1"
         if primitive_shape_pre == 1:
             # plane
-            mesh_size = utils_vis.bound_box(points_shape_gt_raw_scaled)+0.1*np.array([[-1,1],[-1,1],[-1,1]])
+            mesh_size = utils_vis.bound_box(points_shape_gt_dense_scaled)+0.1*np.array([[-1,1],[-1,1],[-1,1]])
             error = 1e-3
             res = resolution*(mesh_size[:,1]- mesh_size[:,0])
         elif primitive_shape_pre == 0:
             # sphere
-            mesh_size = utils_vis.bound_box(points_shape_gt_raw_scaled)+0.1*np.array([[-1,1],[-1,1],[-1,1]])
+            mesh_size = utils_vis.bound_box(points_shape_gt_dense_scaled)+0.1*np.array([[-1,1],[-1,1],[-1,1]])
             res = resolution*(mesh_size[:,1]- mesh_size[:,0])
             error = 1e-3
             margin_pre = [1,1,1]
         else:
-            mesh_size = utils_vis.bound_box(points_shape_gt_raw_scaled)+0.1*np.array([[-1,1],[-1,1],[-1,1]])
+            mesh_size = utils_vis.bound_box(points_shape_gt_dense_scaled)+0.1*np.array([[-1,1],[-1,1],[-1,1]])
             res = resolution*(mesh_size[:,1]- mesh_size[:,0])
-            error = 1e-6
+            error = 1e-3
             margin_pre = [0,0,0]
 
         try:
             if primitive_shape_pre == 1:
                 # continue
-                points_clustered_reconstruction_shape_temp = utils_vis.plane_trim(points_shape_gt_raw_scaled,q_pre,mesh_size,res,error)
+                points_clustered_reconstruction_shape_temp = utils_vis.plane_trim(points_shape_gt_dense_scaled,q_pre,mesh_size,res,error)
             else:
-                points_clustered_reconstruction_shape_temp = utils_vis.others_trim(q_gt,points_shape_gt_raw_scaled,q_pre,"1",mesh_size,res,error,margin_pre,if_trim,primitive_shape_pre)
+                points_clustered_reconstruction_shape_temp = utils_vis.others_trim(q_gt,points_shape_gt_dense_scaled,q_pre,"1",mesh_size,res,error,margin_pre,if_trim,primitive_shape_pre)
             
             if points_clustered_reconstruction_shape_temp.shape[0] == 0:
                 continue_signal = 1
@@ -278,27 +282,23 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
             break
 
         points_clustered_reconstruction_shape =  np.matmul(np.linalg.inv(T_shape),np.concatenate((points_clustered_reconstruction_shape_temp,np.ones((points_clustered_reconstruction_shape_temp.shape[0],1))),1).transpose()).transpose()[:,0:3]
-        points_shape_gt_raw_scaled = np.matmul(np.linalg.inv(T_shape),np.concatenate((points_shape_gt_raw_scaled,np.ones((points_shape_gt_raw_scaled.shape[0],1))),1).transpose()).transpose()[:,0:3]
 
         points_clustered_reconstruction_object.append(points_clustered_reconstruction_shape)
-        points_raw_gt_object.append(points_shape_gt_raw_scaled)
 
     for semgent_index, semgent in enumerate(points_clustered_reconstruction_object):
         if semgent_index == 0:
             points_clustered_reconstruction_object_save = semgent
-            points_raw_gt_object_save = points_raw_gt_object[semgent_index]
         else:
             points_clustered_reconstruction_object_save = np.concatenate((points_clustered_reconstruction_object_save,semgent),0)
-            points_raw_gt_object_save = np.concatenate((points_raw_gt_object_save,points_raw_gt_object[semgent_index]),0)
 
-    res = utils_vis.res_efficient(points_clustered_reconstruction_object_save,points_raw_gt_object_save)
+    res = utils_vis.res_efficient(points_clustered_reconstruction_object_save,points_object_gt)
 
     pcd_reconstruction = o3d.geometry.PointCloud()
     pcd_reconstruction.points = o3d.utility.Vector3dVector(points_clustered_reconstruction_object_save)
     o3d.io.write_point_cloud(save_result_dir_object+"/reconstruction.ply", pcd_reconstruction)
 
     pcd_gt = o3d.geometry.PointCloud()
-    pcd_gt.points = o3d.utility.Vector3dVector(points_raw_gt_object_save)
+    pcd_gt.points = o3d.utility.Vector3dVector(points_object_gt)
     o3d.io.write_point_cloud(save_result_dir_object+"/gt.ply", pcd_gt)
 
     print("Sample: {}, seg_iou: {:.4}, type_iou: {:.4}, res: {:.4}".format(

@@ -43,6 +43,7 @@ The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/
 ```
 * Please download this dataset and put in the **data/** folder.
 # Installation
+* Basic environment:
 ```shell
 cd <QuadricsNet_Path>
 git clone git@github.com:MichaelWu99-lab/QuadricsNet.git
@@ -51,6 +52,21 @@ cd QuadricsNet
 conda env create -f environment.yml -n QuadricsNet
 conda activate QuadricsNet
 ```
+* To generate visual results, lightweight MATLAB environment needs to be built. Download MATLAB runtime: [Google Drive](https://drive.google.com/file/d/12YtgYTj9RG-zvK6V29071lFh1X2kd5-G/view?usp=drive_link) or [Baidu Drive](https://pan.baidu.com/s/13Wl3uz_xTNcJsKV9suA-OA?pwd=fy8k), and then install it:
+```shell
+# Install MATLAB runtime
+cd <matlab_runtime_Path>
+unzip {matlab_runtime}.zip
+./install -mode silent -agreeToLicense yes
+
+# Load {matlab_runtime_install_Path} into an environment variable
+export LD_LIBRARY_PATH={matlab_runtime_install_Path} # {matlab_runtime_install_Path} will be printed in the terminal after installation of MATLAB runtime.
+
+# Install quadrics2points function
+cd <QuadricsNet_Path>/src/quadrics2points/for_redistribution_files_only/
+python setup.py install
+```
+
 # Quickstart with the pretrained model
 ```shell
 python test_e2e_vis.py configs/configs_test/config_e2e.yml
