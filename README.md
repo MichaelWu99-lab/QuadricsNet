@@ -46,7 +46,7 @@ The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/
 * Basic environment:
 ```shell
 cd <QuadricsNet_Path>
-git clone git@github.com:MichaelWu99-lab/QuadricsNet.git
+git clone https://github.com/MichaelWu99-lab/QuadricsNet.git
 cd QuadricsNet
 
 conda env create -f environment.yml -n QuadricsNet
