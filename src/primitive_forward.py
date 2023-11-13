@@ -2,6 +2,8 @@ from cProfile import label
 from calendar import c
 import numpy as np
 import torch
+from torch import linalg as LA
+
 
 from src.fitting_utils import remove_outliers, up_sample_all_in_range
 EPS = np.finfo(np.float32).eps
@@ -177,6 +179,9 @@ def fit_one_shape_torch(data, fitter, weights, eval=False,if_fitting_normals=[0,
             points_input = points
             normals_input = normals
 
+            if primitives == 2:
+                _,_,_,points_input = estimate_cylinder_properties_torch(points_input)
+
             _,index = remove_outliers(points.data.cpu().numpy())
             points_input = points[index]
             normals_input = normals[index]
@@ -338,3 +343,28 @@ def pca_judgment_torch(S,primitives):
             # cylinder and sphere
             shape_axis_index = 0
     return shape_axis_index
+
+def estimate_cylinder_properties_torch(points, k=6):
+    points_mean = torch.mean(points, dim=0)
+    points_centered = points - points_mean
+
+    # PCA
+    u, s, v = torch.pca_lowrank(points_centered, q=3)
+    axis_direction = v[:, 0]
+
+    projected_points = torch.matmul(points_centered, axis_direction)
+    height = torch.max(projected_points) - torch.min(projected_points)
+
+    distances = LA.norm(points_centered - torch.ger(projected_points, axis_direction), dim=1)
+    radius = torch.mean(distances)
+
+    max_height = k * radius
+    if height > max_height:
+        height_limit = max_height
+        valid_indices = (projected_points >= torch.min(projected_points) + (height - height_limit) / 2) & \
+                        (projected_points <= torch.max(projected_points) - (height - height_limit) / 2)
+        points_cropped = points[valid_indices]
+    else:
+        points_cropped = points
+
+    return axis_direction, height, radius, points_cropped

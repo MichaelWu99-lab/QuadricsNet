@@ -51,6 +51,8 @@ model_name = config.model_path.format(
     config.more
 )
 
+DOWN_SAMPLE_NUM = int(sys.argv[2])
+
 # set batch size to 1 for testing
 config.batch_size = 1
 
@@ -114,7 +116,7 @@ else:
 
 torch.cuda.empty_cache()
 model.eval()
-utils_vis = utils_vis()
+utils_vis = utils_vis(DOWN_SAMPLE_NUM)
 
 seg_iou_all = []
 type_iou_all = []
@@ -285,13 +287,16 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
 
         points_clustered_reconstruction_object.append(points_clustered_reconstruction_shape)
 
+    if continue_signal == 1:
+        continue
+
     for semgent_index, semgent in enumerate(points_clustered_reconstruction_object):
         if semgent_index == 0:
             points_clustered_reconstruction_object_save = semgent
         else:
             points_clustered_reconstruction_object_save = np.concatenate((points_clustered_reconstruction_object_save,semgent),0)
 
-    res = utils_vis.res_efficient(points_clustered_reconstruction_object_save,points_object_gt)
+    res = utils_vis.res_efficient(points_clustered_reconstruction_object_save,points_object_gt,DOWN_SAMPLE_NUM)
 
     pcd_reconstruction = o3d.geometry.PointCloud()
     pcd_reconstruction.points = o3d.utility.Vector3dVector(points_clustered_reconstruction_object_save)

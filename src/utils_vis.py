@@ -1,6 +1,5 @@
 import re
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator
 from sklearn.decomposition import PCA
 from skimage import measure
 import sys
@@ -13,9 +12,10 @@ except:
 import os
 
 class utils_vis:
-    def __init__(self):
+    def __init__(self,DOWN_SAMPLE_NUM=40000):
         import numpy as np
-        pass
+        self.DOWN_SAMPLE_NUM = DOWN_SAMPLE_NUM
+
     def bound_box(self,points):
         x_max = np.max(points[:, 0])
         x_min = np.min(points[:, 0])
@@ -62,15 +62,19 @@ class utils_vis:
 
     def quadrics2points_by_matlab(self,q, mesh_size, res, error):
         # generate points_reconstruction from quadrics by matlab function
-        np.savetxt('temp.txt', np.hstack((q,mesh_size.reshape(-1),res,error)))
-        quadrics2points_matlab = quadrics2points.initialize()
-        points_reconstruction = np.array(quadrics2points_matlab.quadrics2points('temp.txt')['vertices'])
-        quadrics2points_matlab.terminate()
-        
-        if os.path.exists('temp.txt'):
-            os.remove('temp.txt')
+        try:
+            np.savetxt('temp.txt', np.hstack((q,mesh_size.reshape(-1),res,error)))
+            quadrics2points_matlab = quadrics2points.initialize()
+            points_reconstruction = np.array(quadrics2points_matlab.quadrics2points('temp.txt')['vertices'])
+            quadrics2points_matlab.terminate()
+            
+            if os.path.exists('temp.txt'):
+                os.remove('temp.txt')
 
-        return points_reconstruction
+            return points_reconstruction
+        except:
+            print("Installation error in the MATLAB environment!")
+            sys.exit()
 
     def plane_trim(self,points_gt, q_pre, mesh_size, res, error):
         Q_pre = self.quadrics2Q(q_pre)
@@ -85,8 +89,10 @@ class utils_vis:
 
         points_reconstruction = self.quadrics2points(q_pre, mesh_size, res, error)
 
-        points_reconstruction_temp = np.expand_dims(points_reconstruction,1)
-        points_gt_temp = np.expand_dims(points_gt,0)
+        # points_reconstruction_temp = np.expand_dims(points_reconstruction,1)
+        # points_gt_temp = np.expand_dims(points_gt,0)
+        points_reconstruction_temp = np.expand_dims(self.down_sample(points_reconstruction,self.DOWN_SAMPLE_NUM),1)
+        points_gt_temp = np.expand_dims(self.down_sample(points_gt,self.DOWN_SAMPLE_NUM),0)
         diff = points_reconstruction_temp - points_gt_temp
         diff = np.sum(diff ** 2,2)
         idx = np.argmin(np.min(diff,1))
@@ -159,11 +165,11 @@ class utils_vis:
             margin_value = np.abs(max_projection_gt) * margin
             points_trim = self.trim(points_reconstruction, max_projection_gt + margin_value, min_projection_gt - margin_value, axis_projection)
 
-        points_trim_temp = np.expand_dims(points_trim,1)
-        points_gt_temp = np.expand_dims(points_gt,0)
-        # diff: [points_trim_temp, num_gt_points, 3]
+        # points_trim_temp = np.expand_dims(points_trim,1)
+        # points_gt_temp = np.expand_dims(points_gt,0)
+        points_trim_temp = np.expand_dims(self.down_sample(points_trim,self.DOWN_SAMPLE_NUM),1)
+        points_gt_temp = np.expand_dims(self.down_sample(points_gt,self.DOWN_SAMPLE_NUM),0)
         diff = points_trim_temp - points_gt_temp
-        # diff: [points_trim_temp, num_gt_points]
         diff = np.sum(diff ** 2,2)
 
         trim_index = np.argmin(diff,0)
@@ -238,7 +244,8 @@ class utils_vis:
         points_trim = np.array(points_trim)
         return points_trim
     
-    def down_sample(self,points, num_sample=10000):
+    def down_sample(self,points, num_sample=40000):
+        # To adapt to memory size, downsampling point clouds can lead to a decrease in res
         if points.shape[0] > num_sample:
             choice = np.random.choice(points.shape[0], num_sample, replace=False)
             points_sample = points[choice, :]
@@ -246,9 +253,10 @@ class utils_vis:
             points_sample = points
         return points_sample
 
-    def res_efficient(self,points_reconstruction,points_gt):
-        points_reconstruction_temp = self.down_sample(points_reconstruction)
-        points_gt_temp = self.down_sample(points_gt)
+    def res_efficient(self,points_reconstruction,points_gt,down_sample_num=40000):
+
+        points_reconstruction_temp = self.down_sample(points_reconstruction,down_sample_num)
+        points_gt_temp = self.down_sample(points_gt,down_sample_num)
 
         points_reconstruction_temp = np.expand_dims(points_reconstruction_temp,1)
         points_gt_temp = np.expand_dims(points_gt_temp,0)
