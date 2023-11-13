@@ -4,7 +4,7 @@
 
 This repository contains the official PyTorch implementation of the [QuadricsNet](https://arxiv.org/pdf/2309.14211.pdf) paper.
 
-[Paper](https://arxiv.org/pdf/2309.14211.pdf) | [Video](https://www.youtube.com/watch?v=0EFhMufuUSI) | Data ([Google Drive](https://drive.google.com/file/d/1AUx9krfJ0GdBeSRfA0bo3_gsBp0uAuFJ/view?usp=share_link), [Baidu Drive](https://pan.baidu.com/s/1jt-54cI9EASf3BgFaYjxlw?pwd=m395))
+[Paper](https://arxiv.org/pdf/2309.14211.pdf) | [Video](https://www.youtube.com/watch?v=0EFhMufuUSI) | Data ([Google Drive](https://drive.google.com/file/d/1toRuKRauOkjEfmZeH2EovYTNeNY_nRJ0/view?usp=drive_link), [Baidu Drive](https://pan.baidu.com/s/1OMnOz8jiSUOyGEC9iTSaSg?pwd=lyou))
 
 # Introduction
 QuadricsNet is an end-to-end framework to learn a concise representation with only 10 parameters for diverse geometric primitives in 3D point clouds. Experiments of primitive parsing on the collected dataset and structure mapping on real-world scenes demonstrate that the quadrics representation is effective and the QuadricsNet framework is robust.
@@ -17,8 +17,36 @@ QuadricsNet is an end-to-end framework to learn a concise representation with on
 # Qualitative results
 ![s](figures/Qualitative_results.gif)
 
+# Installation
+* Basic environment:
+```shell
+conda env create -f environment.yml -n QuadricsNet
+conda activate QuadricsNet
+```
+* To generate visual results, lightweight MATLAB environment needs to be built. Download MATLAB runtime: [Google Drive](https://drive.google.com/file/d/12YtgYTj9RG-zvK6V29071lFh1X2kd5-G/view?usp=drive_link) or [Baidu Drive](https://pan.baidu.com/s/13Wl3uz_xTNcJsKV9suA-OA?pwd=fy8k), and then install it:
+```shell
+# Install MATLAB runtime
+cd <matlab_runtime_Path>
+unzip {matlab_runtime}.zip
+./install -mode silent -agreeToLicense yes
+
+# Load {matlab_runtime_install_Path} into an environment variable
+export LD_LIBRARY_PATH={matlab_runtime_install_Path} # {matlab_runtime_install_Path} will be printed in the terminal after installation of MATLAB runtime.
+
+# Install quadrics2points function
+cd <QuadricsNet_Path>/src/quadrics2points/for_redistribution_files_only/
+python setup.py install
+```
+
+# Quickstart with the pretrained model
+* It is recommended to use at least 128g of RAM for more accurate reconstruction.
+```shell
+python test_e2e_vis.py configs/configs_test/config_e2e.yml 40000 # 40000 is the number of downsampling points during reconstruction, which can be adjusted based on memory size.
+```
+
 # Dataset
-The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/d/1AUx9krfJ0GdBeSRfA0bo3_gsBp0uAuFJ/view?usp=share_link) or [Baidu Drive](https://pan.baidu.com/s/1jt-54cI9EASf3BgFaYjxlw?pwd=m395). 
+The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/d/1toRuKRauOkjEfmZeH2EovYTNeNY_nRJ0/view?usp=drive_link) or [Baidu Drive](https://pan.baidu.com/s/1OMnOz8jiSUOyGEC9iTSaSg?pwd=lyou). The training code will be available later. 
+<!-- Download this dataset and unzip it into **QuadricsNet/** folder. -->
 * The file structure is as follows:
 ```
 |-- data
@@ -40,36 +68,6 @@ The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/
         |-- test
             |-- plane.h5
             |-- ...
-```
-* Please download this dataset and put in the **data/** folder.
-# Installation
-* Basic environment:
-```shell
-cd <QuadricsNet_Path>
-git clone https://github.com/MichaelWu99-lab/QuadricsNet.git
-cd QuadricsNet
-
-conda env create -f environment.yml -n QuadricsNet
-conda activate QuadricsNet
-```
-* To generate visual results, lightweight MATLAB environment needs to be built. Download MATLAB runtime: [Google Drive](https://drive.google.com/file/d/12YtgYTj9RG-zvK6V29071lFh1X2kd5-G/view?usp=drive_link) or [Baidu Drive](https://pan.baidu.com/s/13Wl3uz_xTNcJsKV9suA-OA?pwd=fy8k), and then install it:
-```shell
-# Install MATLAB runtime
-cd <matlab_runtime_Path>
-unzip {matlab_runtime}.zip
-./install -mode silent -agreeToLicense yes
-
-# Load {matlab_runtime_install_Path} into an environment variable
-export LD_LIBRARY_PATH={matlab_runtime_install_Path} # {matlab_runtime_install_Path} will be printed in the terminal after installation of MATLAB runtime.
-
-# Install quadrics2points function
-cd <QuadricsNet_Path>/src/quadrics2points/for_redistribution_files_only/
-python setup.py install
-```
-
-# Quickstart with the pretrained model
-```shell
-python test_e2e_vis.py configs/configs_test/config_e2e.yml
 ```
 
 # Citation
