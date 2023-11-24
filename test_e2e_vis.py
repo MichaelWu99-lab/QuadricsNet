@@ -230,6 +230,7 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
     clustered_primitives_gt_batch = np.stack([clustered_primitives_gt_batch[0][i].data.cpu().numpy() for i in clustered_primitives_gt_batch[0]])
 
     # vislization
+    continue_signal = 0
     points_clustered_reconstruction_object = []
     for shape_index in range(quadrics_gt_batch_scaled.shape[0]):
         
@@ -250,12 +251,11 @@ for test_b_id in range(dataset.test_points.shape[0] // config.batch_size):
         points_object_gt = points_raw[0]
         points_object_gt = np.matmul(T_object,np.concatenate((points_object_gt,np.ones((points_object_gt.shape[0],1))),1).transpose()).transpose()[:,0:3]
 
-
         if_trim="1"
         if primitive_shape_pre == 1:
             # plane
             mesh_size = utils_vis.bound_box(points_shape_gt_dense_scaled)+0.1*np.array([[-1,1],[-1,1],[-1,1]])
-            error = 1e-3
+            error = 1e-6
             res = resolution*(mesh_size[:,1]- mesh_size[:,0])
         elif primitive_shape_pre == 0:
             # sphere
