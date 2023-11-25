@@ -180,11 +180,14 @@ def fit_one_shape_torch(data, fitter, weights, eval=False,if_fitting_normals=[0,
             normals_input = normals
 
             if primitives == 2:
-                _,_,_,points_input = estimate_cylinder_properties_torch(points_input)
+                _,_,_,points_input_cropped,normals_input_copped = estimate_cylinder_properties_torch(points_input,normals_input)
+                if points_input_cropped.shape[0] >= 100:
+                    points_input = points_input_cropped
+                    normals_input = normals_input_copped
 
-            _,index = remove_outliers(points.data.cpu().numpy())
-            points_input = points[index]
-            normals_input = normals[index]
+            _,index = remove_outliers(points_input.data.cpu().numpy())
+            points_input = points_input[index]
+            normals_input = normals_input[index]
 
             num_points_input = 1100
             points_input, normals_input = up_sample_all_in_range(points_input, normals_input, num_points_input)
@@ -344,7 +347,7 @@ def pca_judgment_torch(S,primitives):
             shape_axis_index = 0
     return shape_axis_index
 
-def estimate_cylinder_properties_torch(points, k=6):
+def estimate_cylinder_properties_torch(points,normals,k=4):
     points_mean = torch.mean(points, dim=0)
     points_centered = points - points_mean
 
@@ -364,7 +367,9 @@ def estimate_cylinder_properties_torch(points, k=6):
         valid_indices = (projected_points >= torch.min(projected_points) + (height - height_limit) / 2) & \
                         (projected_points <= torch.max(projected_points) - (height - height_limit) / 2)
         points_cropped = points[valid_indices]
+        normals_cropped = normals[valid_indices]
     else:
         points_cropped = points
+        normals_cropped = normals
 
-    return axis_direction, height, radius, points_cropped
+    return axis_direction, height, radius, points_cropped, normals_cropped

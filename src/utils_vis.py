@@ -107,7 +107,7 @@ class utils_vis:
         
         return points_trim
 
-    def others_trim(self,q_gt, points_gt, q_pre, projection, mesh_size, res, error, margin, if_trim, primitives):
+    def others_trim(self,q_gt, points_gt, q_pre, projection, mesh_size, res, error, margin, if_trim, primitives,epsilon=1.0):
         Q_gt = self.quadrics2Q(q_gt)
         Q_pre = self.quadrics2Q(q_pre)
 
@@ -173,7 +173,8 @@ class utils_vis:
         diff = np.sum(diff ** 2,2)
 
         trim_index = np.argmin(diff,0)
-        points_trim = points_trim[trim_index]
+        nearest_diff = np.min(diff,0)
+        points_trim = points_trim[trim_index[nearest_diff<(np.square(epsilon))]]
 
         return points_trim
 
@@ -265,9 +266,9 @@ class utils_vis:
         # diff: [num_reconstruction_points, num_gt_points]
         diff = np.sqrt(np.sum(diff ** 2,2))
 
-        # diff = np.sqrt(np.sum(diff ** 2,2))
-        distance_0 = np.mean(np.min(diff,1))
+        # distance_0 = np.mean(np.min(diff,1))
         distance_1 = np.mean(np.min(diff,0))
-        res = np.mean([distance_0,distance_1])
+        # res = np.mean([distance_0,distance_1])
+        res = distance_1
         return res
 
