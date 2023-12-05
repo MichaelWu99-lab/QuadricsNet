@@ -91,12 +91,14 @@ class utils_vis:
 
         # points_reconstruction_temp = np.expand_dims(points_reconstruction,1)
         # points_gt_temp = np.expand_dims(points_gt,0)
-        points_reconstruction_temp = np.expand_dims(self.down_sample(points_reconstruction,self.DOWN_SAMPLE_NUM),1)
-        points_gt_temp = np.expand_dims(self.down_sample(points_gt,self.DOWN_SAMPLE_NUM),0)
-        diff = points_reconstruction_temp - points_gt_temp
+        points_reconstruction_temp = self.down_sample(points_reconstruction,self.DOWN_SAMPLE_NUM)
+        points_reconstruction_temp_ex = np.expand_dims(points_reconstruction_temp,1)
+        points_gt_temp = self.down_sample(points_gt,self.DOWN_SAMPLE_NUM)
+        points_gt_temp_ex = np.expand_dims(points_gt_temp,0)
+        diff = points_reconstruction_temp_ex - points_gt_temp_ex
         diff = np.sum(diff ** 2,2)
         idx = np.argmin(np.min(diff,1))
-        point_nerest = points_reconstruction[idx]
+        point_nerest = points_reconstruction_temp[idx]
 
         t = (vector_pre[0]*point_nerest[0] + vector_pre[1]*point_nerest[1] + vector_pre[2]*point_nerest[2]) - \
     (vector_pre[0]*points_gt[:,0] + vector_pre[1]*points_gt[:,1] + vector_pre[2]*points_gt[:,2])
@@ -167,14 +169,16 @@ class utils_vis:
 
         # points_trim_temp = np.expand_dims(points_trim,1)
         # points_gt_temp = np.expand_dims(points_gt,0)
-        points_trim_temp = np.expand_dims(self.down_sample(points_trim,self.DOWN_SAMPLE_NUM),1)
-        points_gt_temp = np.expand_dims(self.down_sample(points_gt,self.DOWN_SAMPLE_NUM),0)
-        diff = points_trim_temp - points_gt_temp
+        points_trim_temp = self.down_sample(points_trim,self.DOWN_SAMPLE_NUM)
+        points_trim_temp_ex = np.expand_dims(points_trim_temp,1)
+        points_gt_temp = self.down_sample(points_gt,self.DOWN_SAMPLE_NUM)
+        points_gt_temp_ex = np.expand_dims(points_gt_temp,0)
+        diff = points_trim_temp_ex - points_gt_temp_ex
         diff = np.sum(diff ** 2,2)
 
         trim_index = np.argmin(diff,0)
         nearest_diff = np.min(diff,0)
-        points_trim = points_trim[trim_index[nearest_diff<(np.square(epsilon))]]
+        points_trim = points_trim_temp[trim_index[nearest_diff<(np.square(epsilon))]]
 
         return points_trim
 
