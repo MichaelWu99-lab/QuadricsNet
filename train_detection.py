@@ -43,6 +43,18 @@ model_name = config.model_path.format(
 
 print("Model name: ", model_name)
 
+os.makedirs(
+    "logs/tensorboard/train_feature/{}/train".format(model_name),
+    exist_ok=True,
+)
+os.makedirs(
+    "logs/tensorboard/train_feature/{}/val".format(model_name),
+    exist_ok=True,
+)
+os.makedirs(
+    "logs/logs".format(model_name),
+    exist_ok=True,
+)
 logger_train = Logger("logs/tensorboard/train_feature/{}/train".format(model_name), flush_secs=15)
 logger_val = Logger("logs/tensorboard/train_feature/{}/val".format(model_name), flush_secs=15)
 
