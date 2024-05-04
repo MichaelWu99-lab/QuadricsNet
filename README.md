@@ -40,6 +40,7 @@ python setup.py install
 
 # Quickstart with the pretrained model
 * It is recommended to use at least 128 GB of RAM for more accurate reconstruction.
+* Qualitative results are in `logs\results_vis`.
 ```shell
 python test_e2e_vis.py configs/configs_test/config_demo.yml 40000 # 40000 is the number of downsampling points during reconstruction, which can be adjusted based on memory size.
 ```
