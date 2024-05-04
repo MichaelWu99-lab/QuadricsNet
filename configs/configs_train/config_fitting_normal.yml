@@ -9,34 +9,18 @@ Q_size = 10
 d_mean = True
 d_rotation = True
 d_scale = True
-# 可以决定不使用normals作为输入
 if_normals = True
 # -------------------
-# dataset_dir = "data_quadrics/ABCdataset/data/oneShape/"
 test_on_another_dataset = True
 dataset_dir = "data/quadrics_segments/train/"
 dataset_test_dir = "data/quadrics_segments/test/"
 # -------------------
 
-# 可以决定使用何种损失函数
 model_path = "14_trans_mode_{}_numpoi_{}_normalsInput_{}_losswei_{}_{}_{}_{}_{}_{}_{}_bt_{}_lr_{}_shape_{}_more_{}"
-
-# #####debug#####
-# # number of training instance
-# # 数量和比例均可，优先数量
-# more = "debug_trans3.5_pca_ABC_4_3_1"
-# num_train=0
-# num_val=0
-# num_test=0
-# rate_train=0.006
-# rate_val=0.1
-# rate_test=0.004
-# batch_size = 32
-# ####end#####
 
 #####run#####
 # number of training instance
-# 数量和比例均可，优先数量
+# num and rate are acceptable, preferred quantity
 more = "run_trans_1"
 num_train=0
 num_val=0
@@ -47,7 +31,6 @@ rate_test=1
 batch_size = 384
 #####end#####
 
-# 被抽取训练的点数
 num_points=1100
 
 num_epochs = 200
