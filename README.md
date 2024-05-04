@@ -39,13 +39,13 @@ python setup.py install
 ```
 
 # Quickstart with the pretrained model
-* It is recommended to use at least 128g of RAM for more accurate reconstruction.
+* It is recommended to use at least 128 GB of RAM for more accurate reconstruction.
 ```shell
-python test_e2e_vis.py configs/configs_test/config_e2e.yml 40000 # 40000 is the number of downsampling points during reconstruction, which can be adjusted based on memory size.
+python test_e2e_vis.py configs/configs_test/config_demo.yml 40000 # 40000 is the number of downsampling points during reconstruction, which can be adjusted based on memory size.
 ```
 
 # Dataset
-The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/d/1toRuKRauOkjEfmZeH2EovYTNeNY_nRJ0/view?usp=drive_link) or [Baidu Drive](https://pan.baidu.com/s/1OMnOz8jiSUOyGEC9iTSaSg?pwd=lyou). The training code will be available later. 
+The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/d/1toRuKRauOkjEfmZeH2EovYTNeNY_nRJ0/view?usp=drive_link) or [Baidu Drive](https://pan.baidu.com/s/1OMnOz8jiSUOyGEC9iTSaSg?pwd=lyou).
 <!-- Download this dataset and unzip it into **QuadricsNet/** folder. -->
 * The file structure is as follows:
 ```
@@ -69,6 +69,25 @@ The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/
             |-- plane.h5
             |-- ...
 ```
+
+# Training
+* Quadrics fitting module training. It is recommended to use at least 48 GB of GPU memory.
+```shell
+bash scripts/train.sh
+``` 
+* Quadrics dection module training. It is recommended to use at least 48 GB of GPU memory.
+```shell
+python train_detection.py configs/configs_train/config_detection.yml
+``` 
+* [Optional] End-to-end training. It is recommended to use at least 96 GB of GPU memory.
+```shell
+python train_e2e.py configs/configs_train/config_e2e.yml
+``` 
+
+# Test
+```shell
+python test_e2e_vis.py configs/configs_test/config_e2e.yml 40000 # To use the retrained model, fitting_model_path and detection_model_path in config_e2e.yml need to be modified.
+``` 
 
 # Citation
 If you find our work useful, please consider citing our paper:

@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+import sys
+sys.path.append(r'./')
 
 EPS = np.finfo(np.float32).eps
 

@@ -183,14 +183,21 @@ def quadrics_function_loss(output, points, config, quadrics=0):
 
     # loss_quadrics_function = mean(x*Q*xT)
     for i in range(config.batch_size):
-        points_each = points_append[i].unsqueeze(0)
-        points_each = points_each.permute(2, 0, 1)
+        # points_each = points_append[i].unsqueeze(0)
+        # points_each = points_each.permute(2, 0, 1)
+        # Q_each = Q[i]
+        # loss_quadrics_function_each = torch.mean(torch.matmul(torch.matmul(points_each, Q_each), points_each.transpose(2, 1)).pow(2))
+
         Q_each = Q[i]
-        loss_quadrics_function_each = torch.matmul(torch.matmul(points_each, Q_each), points_each.transpose(2, 1)).pow(2)
+        loss_quadrics_function_each = torch.mean(torch.einsum('ij,jk,ki->i', points_append[i].T, Q_each, points_append[i]).pow(2))
+
+        loss_quadrics_function_each = torch.unsqueeze(loss_quadrics_function_each, 0)
+
         if i == 0:
             loss_quadrics_function = loss_quadrics_function_each
         else:
             loss_quadrics_function = torch.cat((loss_quadrics_function, loss_quadrics_function_each), 0)
+
     loss_quadrics_function = torch.mean(loss_quadrics_function)
 
     return loss_quadrics_function
@@ -214,14 +221,21 @@ def Taubin_distance_loss(output, points, config, quadrics=0):
     append_one = append_one.cuda()
     points_append = torch.cat((points, append_one), 1)
 
-    # loss_quadrics_function = mean(x*Q*xT)
     for i in range(config.batch_size):
-        points_each = points_append[i].unsqueeze(0)
-        points_each = points_each.permute(2, 0, 1)
+
+        # x*Q*xT
+        # points_each = points_append[i].unsqueeze(0)
+        # points_each = points_each.permute(2, 0, 1)
+        # Q_each = Q[i]
+        # quadrics_function_each = torch.matmul(torch.matmul(points_each, Q_each), points_each.transpose(2, 1)).pow(2).squeeze()
+
         Q_each = Q[i]
-        quadrics_function_each = torch.matmul(torch.matmul(points_each, Q_each), points_each.transpose(2, 1)).pow(2).squeeze()
+        quadrics_function_each = torch.einsum('ij,jk,ki->i', points_append[i].T, Q_each, points_append[i]).pow(2)
+
         deta_function_each = torch.norm(compute_normals_analytically_torch(points[i].permute(1,0),q[i],if_normalize=False),dim=1,p=2).pow(2)
-        loss_Taubin_distance_each = quadrics_function_each / (deta_function_each + 1e-8)
+        loss_Taubin_distance_each = torch.mean(quadrics_function_each / (deta_function_each + 1e-8))
+        loss_Taubin_distance_each = torch.unsqueeze(loss_Taubin_distance_each, 0)
+
         if i == 0:
             loss_Taubin_distance = loss_Taubin_distance_each
         else:
@@ -247,8 +261,8 @@ def quadrics_decomposition_loss(output, config, quadrics,trans_inv,C,mode="train
                                         [q_pre[i, 3], q_pre[i, 1], q_pre[i, 5], q_pre[i, 7]],
                                         [q_pre[i, 4], q_pre[i, 5], q_pre[i, 2], q_pre[i, 8]],
                                         [q_pre[i, 6], q_pre[i, 7], q_pre[i, 8], q_pre[i, 9]]]).cuda(q_pre.device)
-                Q_gt_each,_ = quadrics_scale_identification(Q_gt_each)
-                Q_pre_each,_ = quadrics_scale_identification(Q_pre_each)
+                Q_gt_each,_ = quadrics_scale_identification(Q_gt_each,config.shape)
+                Q_pre_each,_ = quadrics_scale_identification(Q_pre_each,config.shape)
             
             elif config.shape in ["plane","cone","elliptic_cone"]:
 
@@ -270,7 +284,7 @@ def quadrics_decomposition_loss(output, config, quadrics,trans_inv,C,mode="train
                                         [q_gt[i, 3], q_gt[i, 1], q_gt[i, 5], q_gt[i, 7]],
                                         [q_gt[i, 4], q_gt[i, 5], q_gt[i, 2], q_gt[i, 8]],
                                         [q_gt[i, 6], q_gt[i, 7], q_gt[i, 8], q_gt[i, 9]]]).cuda(q_gt.device)
-                _,scale_identification_gt = quadrics_scale_identification(Q_gt_each)
+                _,scale_identification_gt = quadrics_scale_identification(Q_gt_each,config.shape)
                 Is_add = 1
             elif config.shape in ["plane","cone","elliptic_cone"]:
                 Q_gt_each = torch.tensor([[q_gt[i, 0], q_gt[i, 3], q_gt[i, 4], q_gt[i, 6]],
@@ -279,7 +293,6 @@ def quadrics_decomposition_loss(output, config, quadrics,trans_inv,C,mode="train
                                         [q_gt[i, 6], q_gt[i, 7], q_gt[i, 8], q_gt[i, 9]]]).cuda(q_gt.device)
                 scale_identification_gt = 0
                 Is_add = 0
-
             
         ###########################
         # trans_inv=[R.T, -R.T*t
@@ -308,7 +321,7 @@ def quadrics_decomposition_loss(output, config, quadrics,trans_inv,C,mode="train
             value_pre_each_sorted,idx_pre_each = torch.sort(torch.diag(C_pre_each)[0:3],descending=True)
             vector_pre_each_sorted = trans_r[:,idx_pre_each]
 
-            scale_pre_each_sorted = torch.sqrt(1 / ((Is_gt_each * value_pre_each_sorted)+ 1e-8))
+            scale_pre_each_sorted = torch.sqrt(torch.abs(1 / ((Is_gt_each * value_pre_each_sorted)+ 1e-8)))
         elif mode == "eval":
             E_pre_each = Q_pre_each[0:3,0:3]
             value_pre_each,vector_pre_each = torch.eig(E_pre_each, eigenvectors=True)
@@ -316,19 +329,23 @@ def quadrics_decomposition_loss(output, config, quadrics,trans_inv,C,mode="train
             vector_pre_each_sorted = vector_pre_each[:,idx_pre_each]
 
             scale_pre_each_sorted = torch.sqrt(torch.abs(1 / ((Is_gt_each * value_pre_each_sorted)+ 1e-8)))
+
         scale_pre_each_sorted = torch.diag_embed(scale_pre_each_sorted).cuda(q_gt.device)
         value_pre_each_sorted = torch.diag_embed(value_pre_each_sorted).cuda(q_gt.device)
 
         ###########################
-        if (config.shape in ["cone","elliptic_cone"]) and mode=="eval":
-            if sum(torch.diag(value_gt_each_sorted) < 0) == 1:
-                factor_gt = -value_gt_each_sorted[value_gt_each_sorted < 0]
-                value_gt_each_sorted = value_gt_each_sorted / factor_gt
-                Q_gt_each = Q_gt_each / factor_gt
-
-            if sum(torch.diag(value_pre_each_sorted) < 0) == 1:
-                factor_pre = -value_pre_each_sorted[value_pre_each_sorted < 0]
-                value_pre_each_sorted = value_pre_each_sorted / factor_pre
+        # just for scale
+        if (config.shape in ["cone","elliptic_cone"]):
+            if mode=="eval":
+                if sum(torch.diag(value_gt_each_sorted) < 0) == 1:
+                    factor_gt = -value_gt_each_sorted[value_gt_each_sorted < 0]
+                    scale_gt_each_sorted = scale_gt_each_sorted * torch.sqrt(factor_gt)
+                    
+                if sum(torch.diag(value_pre_each_sorted) < 0) == 1:
+                    # 在训练过程早期，可能会出出现多个特征值为负的情况
+                    factor_pre = -value_pre_each_sorted[value_pre_each_sorted < 0]
+                    scale_pre_each_sorted = scale_pre_each_sorted * torch.sqrt(factor_pre)
+            # print(torch.diag(scale_gt_each_sorted),"\n",torch.diag(scale_pre_each_sorted))
 
         ###########################
         # ldr
@@ -347,12 +364,13 @@ def quadrics_decomposition_loss(output, config, quadrics,trans_inv,C,mode="train
             loss_decomposition_s_each = torch.sum(Is_gt_each)
         else:
             if mode=="train":
-                loss_decomposition_s_each = torch.sum(((value_gt_each_sorted - value_pre_each_sorted)**2))
-                loss_decomposition_s_each = loss_decomposition_s_each + ((C_pre_each[3,3] + scale_identification_gt)) ** 2
+                # 训练时，没有直接用lds乘以Is，要考虑到cone类的情况，虽然lds=0，但是要考虑到比例
+                loss_decomposition_s_each = torch.sum(torch.abs(value_gt_each_sorted - value_pre_each_sorted))
+                loss_decomposition_s_each = loss_decomposition_s_each + torch.abs(C_pre_each[3,3] + scale_identification_gt)
                 loss_decomposition_s_each = loss_decomposition_s_each/(torch.count_nonzero(value_gt_each_sorted)+Is_add)
             elif mode == "eval":
-                loss_decomposition_s_each = torch.sum((torch.matmul((scale_gt_each_sorted - scale_pre_each_sorted),torch.diag_embed(Is_gt_each))**2))/torch.sum(Is_gt_each)
-
+                loss_decomposition_s_each = torch.sum((torch.abs(torch.matmul((scale_gt_each_sorted - scale_pre_each_sorted),torch.diag_embed(Is_gt_each)))))/torch.sum(Is_gt_each)
+                
         ###########################
         # ldt
         # lamb * v.T * t +  v.T * l   (It=1)
@@ -360,7 +378,7 @@ def quadrics_decomposition_loss(output, config, quadrics,trans_inv,C,mode="train
             loss_decomposition_t_each = torch.sum(It_gt_each)
         else:
             loss_decomposition_t_each = torch.sum(torch.matmul(torch.matmul(torch.matmul(value_gt_each_sorted,vector_gt_each_sorted.transpose(1,0)),trans_t) + torch.matmul(vector_gt_each_sorted.transpose(1,0),Q_gt_each[0:3,3]),torch.diag_embed(It_gt_each))**2)/torch.sum(It_gt_each)
-        
+
         ###########################
         if i == 0:
             loss_decomposition_r = loss_decomposition_r_each.unsqueeze(0)
@@ -378,13 +396,39 @@ def quadrics_decomposition_loss(output, config, quadrics,trans_inv,C,mode="train
 
     return loss_decomposition_r,loss_decomposition_s,loss_decomposition_t
 
+# def quadrics_scale_identification(Q):
+#     eigenvalue_Q,_ = torch.eig(Q,eigenvectors=False)
+#     eigenvalue_Q = eigenvalue_Q[:,0]
 
-def quadrics_scale_identification(Q):
+#     eigenvalue_Q_sum = torch.sum(torch.abs(eigenvalue_Q))
+#     eigenvalue_Q = eigenvalue_Q[torch.where(torch.abs(eigenvalue_Q) > (eigenvalue_Q_sum * 0.001))]
+
+#     scale_Q = torch.tensor([1]).cuda()
+#     for i in eigenvalue_Q:
+#         scale_Q = scale_Q * i
+
+#     eigenvalue_E,_ = torch.eig(Q[0:3,0:3],eigenvectors=False)
+#     eigenvalue_E = eigenvalue_E[:,0]
+
+#     eigenvalue_E_sum = torch.sum(torch.abs(eigenvalue_E))
+#     eigenvalue_E = eigenvalue_E[torch.where(torch.abs(eigenvalue_E) > (eigenvalue_E_sum * 0.001))]
+#     scale_E = torch.tensor([1]).cuda()
+
+#     for i in eigenvalue_E:
+#         scale_E = scale_E * i
+    
+#     scale_identification = torch.abs(scale_E / scale_Q)
+#     Q = scale_identification * Q
+#     return Q,np.squeeze(1/scale_identification)
+
+def quadrics_scale_identification(Q,prim):
     eigenvalue_Q,_ = torch.eig(Q,eigenvectors=False)
     eigenvalue_Q = eigenvalue_Q[:,0]
 
-    eigenvalue_Q_sum = torch.sum(torch.abs(eigenvalue_Q))
-    eigenvalue_Q = eigenvalue_Q[torch.where(torch.abs(eigenvalue_Q) > (eigenvalue_Q_sum * 0.001))]
+    if prim in ["cylinder","elliptic_cylinder"]:
+        min_abs_index = torch.argmin(torch.abs(eigenvalue_Q))
+        # 删除该元素
+        eigenvalue_Q = torch.cat((eigenvalue_Q[:min_abs_index], eigenvalue_Q[min_abs_index + 1:]))
 
     scale_Q = torch.tensor([1]).cuda()
     for i in eigenvalue_Q:
@@ -393,8 +437,13 @@ def quadrics_scale_identification(Q):
     eigenvalue_E,_ = torch.eig(Q[0:3,0:3],eigenvectors=False)
     eigenvalue_E = eigenvalue_E[:,0]
 
-    eigenvalue_E_sum = torch.sum(torch.abs(eigenvalue_E))
-    eigenvalue_E = eigenvalue_E[torch.where(torch.abs(eigenvalue_E) > (eigenvalue_E_sum * 0.001))]
+    if prim in ["cylinder","elliptic_cylinder"]:
+        # eigenvalue_E = eigenvalue_E[np.where(np.abs(eigenvalue_E) > (eigenvalue_E_sum * 0.01))]
+        # 找到绝对值最小的元素的索引
+        min_abs_index = torch.argmin(torch.abs(eigenvalue_E))
+        # 删除该元素
+        eigenvalue_E = torch.cat((eigenvalue_E[:min_abs_index], eigenvalue_E[min_abs_index + 1:]))
+
     scale_E = torch.tensor([1]).cuda()
 
     for i in eigenvalue_E:
@@ -406,34 +455,37 @@ def quadrics_scale_identification(Q):
 
 def quadrics_judgment(eigenvalue):
 
-    margin = 1e-5
+    # margin_0: 衡量比值，决定了Is和It
+    margin_0 = 1e-2
+    # margin_1: 衡量比值的差值，决定了Ir
+    margin_1 = 1e-2
+
     x = eigenvalue[1]/eigenvalue[0]
     y = eigenvalue[2]/eigenvalue[0]
 
     # translation degeneration
-    It = (torch.abs(eigenvalue)>margin).float().cuda(eigenvalue.device)
+    It = (torch.abs(eigenvalue)>margin_0).float().cuda(eigenvalue.device)
 
     # scale degeneration
-    
     Is = It
 
     # in case of plane [1 0 0 0]
-    if torch.abs(x) < margin and torch.abs(y) < margin:
+    if torch.abs(x) < margin_0 and torch.abs(y) < margin_0:
         Is = torch.tensor([0,0,0]).float().cuda(eigenvalue.device)
     # in case of cylinder [1 1 0 -1]
-    if x > margin and torch.abs(y) < margin:
+    if x > margin_0 and torch.abs(y) < margin_0:
         Is = torch.tensor([1,1,0]).float().cuda(eigenvalue.device)
     # in case of cone [1 1 -1 0]
-    if x > margin and y < -margin:
+    if x > margin_0 and y < -margin_0:
         Is = torch.tensor([1,1,0]).float().cuda(eigenvalue.device)
 
     # rotation degeneration
     Ir = torch.ones(3).cuda(eigenvalue.device)
 
-    if torch.abs(x - 1) < margin:
+    if torch.abs(x - 1) < margin_1:
         Ir[1] = 0
         Ir[0] = 0
-    if torch.abs(x - y) < margin:
+    if torch.abs(x - y) < margin_1:
         Ir[1] = 0
         Ir[2] = 0
     

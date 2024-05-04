@@ -1,8 +1,12 @@
+import imp
 import re
 import numpy as np
 from sklearn.decomposition import PCA
 from skimage import measure
 import sys
+import open3d as o3d
+from scipy.spatial import KDTree
+
 
 try:
     import quadrics2points
@@ -39,7 +43,7 @@ class utils_vis:
         q = np.array([Q[0, 0],Q[1, 1],Q[2, 2],Q[0, 1],Q[0, 2],Q[1, 2],Q[0, 3],Q[1, 3],Q[2, 3],Q[3, 3]])
         return q
 
-    def quadrics2points(self,q, mesh_size, res, error):
+    def quadrics2points_py(self,q, mesh_size, res, error):
         xlow = mesh_size[0, 0]
         xhigh = mesh_size[0, 1]
         ylow = mesh_size[1, 0]
@@ -76,7 +80,7 @@ class utils_vis:
             print("Installation error in the MATLAB environment!")
             sys.exit()
 
-    def plane_trim(self,points_gt, q_pre, mesh_size, res, error):
+    def plane_trim(self,points_gt, q_pre, mesh_size, res, error,shape_index,epsilon=0.1,if_points_trim="1"):
         Q_pre = self.quadrics2Q(q_pre)
         
         # Determine the plane normal vector
@@ -87,7 +91,7 @@ class utils_vis:
         
         q_pre = self.Q2quadrics(Q_pre)
 
-        points_reconstruction = self.quadrics2points(q_pre, mesh_size, res, error)
+        points_reconstruction = self.quadrics2points_py(q_pre, mesh_size, res, error)
 
         # points_reconstruction_temp = np.expand_dims(points_reconstruction,1)
         # points_gt_temp = np.expand_dims(points_gt,0)
@@ -98,18 +102,32 @@ class utils_vis:
         diff = points_reconstruction_temp_ex - points_gt_temp_ex
         diff = np.sum(diff ** 2,2)
         idx = np.argmin(np.min(diff,1))
-        point_nerest = points_reconstruction_temp[idx]
+        point_nearest = points_reconstruction_temp[idx]
 
-        t = (vector_pre[0]*point_nerest[0] + vector_pre[1]*point_nerest[1] + vector_pre[2]*point_nerest[2]) - \
+        t = (vector_pre[0]*point_nearest[0] + vector_pre[1]*point_nearest[1] + vector_pre[2]*point_nearest[2]) - \
     (vector_pre[0]*points_gt[:,0] + vector_pre[1]*points_gt[:,1] + vector_pre[2]*points_gt[:,2])
 
-        points_trim = np.column_stack((points_gt[:,0] + vector_pre[1]*t,
-                               points_gt[:,1] + vector_pre[2]*t,
-                               points_gt[:,2] + vector_pre[0]*t))
-        
+        points_trim = np.column_stack((points_gt[:,0] + vector_pre[0]*t,
+                               points_gt[:,1] + vector_pre[1]*t,
+                               points_gt[:,2] + vector_pre[2]*t))
+
+        if if_points_trim == "1":
+            # trim: nearest and within a certain distance
+            points_trim_temp = self.down_sample(points_trim,self.DOWN_SAMPLE_NUM)
+            points_trim_temp_ex = np.expand_dims(points_trim_temp,1)
+            points_gt_temp = self.down_sample(points_gt,self.DOWN_SAMPLE_NUM)
+            points_gt_temp_ex = np.expand_dims(points_gt_temp,0)
+            diff = points_trim_temp_ex - points_gt_temp_ex
+            diff = np.sum(diff ** 2,2)
+
+            trim_index = np.argmin(diff,0)
+            nearest_diff = np.min(diff,0)
+            points_trim = points_trim_temp[trim_index[nearest_diff<(np.square(epsilon))]]
+            # print("Index:",shape_index,"prmi:",1,"res_max:",np.sqrt(nearest_diff.max()),"num_trimmed",points_trim_temp.shape[0],"-",points_trim.shape[0])
+
         return points_trim
 
-    def others_trim(self,q_gt, points_gt, q_pre, projection, mesh_size, res, error, margin, if_trim, primitives,epsilon=1.0):
+    def others_trim(self,q_gt, points_gt, q_pre, projection, mesh_size, res, error, margin, if_aixs_trim, primitives,shape_index,epsilon=0.1,if_points_trim="1"):
         Q_gt = self.quadrics2Q(q_gt)
         Q_pre = self.quadrics2Q(q_pre)
 
@@ -138,7 +156,6 @@ class utils_vis:
             axis_projection = vector_pre @ np.diag(Ir_gt)
 
         # If the axis cannot be found from the Quadrics coefficient, then find it from the points
-        # Mainly for spheres
         if np.sum(axis_projection) == 0:
             pca = PCA(n_components=3)
             pca.fit(points_gt)
@@ -147,9 +164,6 @@ class utils_vis:
             if primitives == 1:
                 # plane
                 axis_projection_temp = U_sorted[:, 2]
-            elif primitives == 3:
-                # cone
-                axis_projection_temp = U_sorted[:, self.judgment_pca(S_sorted, primitives)]
             else:
                 axis_projection_temp = U_sorted[:, self.judgment_pca(S_sorted, primitives)]
             axis_projection[:, 0] = axis_projection_temp
@@ -161,26 +175,37 @@ class utils_vis:
 
         points_reconstruction = self.quadrics2points_by_matlab(q_pre, mesh_size, res, error)
 
-        if if_trim == "0":
+        if if_aixs_trim == "0":
             points_trim = points_reconstruction
         else:
             margin_value = np.abs(max_projection_gt) * margin
             points_trim = self.trim(points_reconstruction, max_projection_gt + margin_value, min_projection_gt - margin_value, axis_projection)
 
-        # points_trim_temp = np.expand_dims(points_trim,1)
-        # points_gt_temp = np.expand_dims(points_gt,0)
-        points_trim_temp = self.down_sample(points_trim,self.DOWN_SAMPLE_NUM)
-        points_trim_temp_ex = np.expand_dims(points_trim_temp,1)
-        points_gt_temp = self.down_sample(points_gt,self.DOWN_SAMPLE_NUM)
-        points_gt_temp_ex = np.expand_dims(points_gt_temp,0)
-        diff = points_trim_temp_ex - points_gt_temp_ex
-        diff = np.sum(diff ** 2,2)
+        if if_points_trim == "1":
+            # trim: nearest and within a certain distance
+            points_trim_temp = self.down_sample(points_trim,self.DOWN_SAMPLE_NUM)
+            points_trim_temp_ex = np.expand_dims(points_trim_temp,1)
+            points_gt_temp = self.down_sample(points_gt,self.DOWN_SAMPLE_NUM)
+            points_gt_temp_ex = np.expand_dims(points_gt_temp,0)
+            diff = points_trim_temp_ex - points_gt_temp_ex
+            diff = np.sum(diff ** 2,2)
 
-        trim_index = np.argmin(diff,0)
-        nearest_diff = np.min(diff,0)
-        points_trim = points_trim_temp[trim_index[nearest_diff<(np.square(epsilon))]]
+            trim_index = np.argmin(diff,0)
+            nearest_diff = np.min(diff,0)
+            points_trim = points_trim_temp[trim_index[nearest_diff<(np.square(epsilon))]]
+            # print("Index:",shape_index,"prmi:",primitives,"res_max:",np.sqrt(nearest_diff.max()),"num_trimmed",points_trim_temp.shape[0],"-",points_trim.shape[0])
 
         return points_trim
+
+    def find_nearest_within_epsilon(self,points_trim_temp, points_gt_temp, epsilon):
+
+        # 使用KD树查找最近点
+        tree = KDTree(points_gt_temp)
+        distances, _ = tree.query(points_trim_temp)
+
+        # 筛选出距离小于 epsilon 的点
+        within_epsilon = distances < epsilon
+        return points_trim_temp[within_epsilon]
 
     def judgment(self,d):
         d = np.sort(d)[::-1]
@@ -223,18 +248,18 @@ class utils_vis:
 
         margin = 0.1
         if np.abs(x - 1) < margin:
-            shape_axis_index = 3
-        elif np.abs(y - 1) < margin:
             shape_axis_index = 2
-        elif np.abs(x - y) < margin:
+        elif np.abs(y - 1) < margin:
             shape_axis_index = 1
+        elif np.abs(x - y) < margin:
+            shape_axis_index = 0
         else:
             if primitives == "cone":
                 # cone
-                shape_axis_index = 3
+                shape_axis_index = 2
             else:
                 # cylinder and sphere
-                shape_axis_index = 1
+                shape_axis_index = 0
 
         return shape_axis_index
 
@@ -260,6 +285,11 @@ class utils_vis:
 
     def res_efficient(self,points_reconstruction,points_gt,down_sample_num=40000):
 
+        if isinstance(points_reconstruction, o3d.geometry.PointCloud):
+            points_reconstruction = np.asarray(points_reconstruction.points)
+        if isinstance(points_gt, o3d.geometry.PointCloud):
+            points_gt = np.asarray(points_gt.points)
+
         points_reconstruction_temp = self.down_sample(points_reconstruction,down_sample_num)
         points_gt_temp = self.down_sample(points_gt,down_sample_num)
 
@@ -271,8 +301,74 @@ class utils_vis:
         diff = np.sqrt(np.sum(diff ** 2,2))
 
         # distance_0 = np.mean(np.min(diff,1))
-        distance_1 = np.mean(np.min(diff,0))
+        distance_1_all = np.min(diff,0)
+        p_cover_1 = np.mean(distance_1_all<0.01)
+        p_cover_2 = np.mean(distance_1_all<0.02)
+        distance_1 = np.mean(distance_1_all)
         # res = np.mean([distance_0,distance_1])
         res = distance_1
-        return res
+        return res,p_cover_1,p_cover_2
+    
+    def res_knn(self,points_reconstruction,points_gt):
 
+        # 当points_reconstruction是open3d的点云时
+        if isinstance(points_reconstruction, o3d.geometry.PointCloud):
+            pcd1 = points_reconstruction
+            pcd2 = points_gt
+        else:
+            pcd1 = o3d.geometry.PointCloud()
+            pcd1.points = o3d.utility.Vector3dVector(points_reconstruction)
+            pcd2 = o3d.geometry.PointCloud()
+            pcd2.points = o3d.utility.Vector3dVector(points_gt)
+
+        # 将点云转换为numpy数组
+        points1 = np.asarray(pcd1.points)
+
+        # 为第二个点云创建一个KDTree
+        kdtree = o3d.geometry.KDTreeFlann(pcd2)
+
+        # 计算第一个点云中每个点到第二个点云中最近点的距离
+        distances = []
+        for point in points1:
+            _, _, dist = kdtree.search_knn_vector_3d(point, 1)
+            distances.append(np.sqrt(dist[0]))
+
+        res = np.mean(distances)
+        p_cover_1 = np.mean(np.array(distances)<0.01)
+        p_cover_2 = np.mean(np.array(distances)<0.02)
+        return res,p_cover_1,p_cover_2
+
+    def reconstruction_quadrics(self,shape,if_axis_trim,if_points_trim,points_input_scaled,quadrics_pre_scaled,quadrics_gt_scaled,DOWN_SAMPLE_NUM):
+        resolution = 1*1e-2
+        if "plane" in shape:
+            # plane
+            mesh_size = self.bound_box(points_input_scaled)+0.1*np.array([[-1,1],[-1,1],[-1,1]])
+            error = 1e-3
+            res = resolution*(mesh_size[:,1]- mesh_size[:,0])
+        elif "sphere" in shape or "ellipsoid" in shape:
+            # sphere
+            mesh_size = self.bound_box(points_input_scaled)+1*np.array([[-1,1],[-1,1],[-1,1]])
+            res = resolution*(mesh_size[:,1]- mesh_size[:,0])
+            error = 1e-3
+            margin_pre = [10,10,10]
+        else:
+            mesh_size = self.bound_box(points_input_scaled)+1*np.array([[-1,1],[-1,1],[-1,1]])
+            res = resolution*(mesh_size[:,1]- mesh_size[:,0])
+            error = 1e-3
+            margin_pre = [10,10,0]
+
+        if "plane" in shape:
+            # continue
+            points_reconstruction_shape_temp = self.plane_trim(points_input_scaled,quadrics_pre_scaled,mesh_size,res,error,0,if_points_trim=if_points_trim)
+        else:
+            if "cone" in shape:
+                primitive_shape_pre = 3
+            elif "cylinder" in shape:
+                primitive_shape_pre = 2
+            elif "sphere" in shape or "ellipsoid" in shape:
+                primitive_shape_pre = 0
+            points_reconstruction_shape_temp = self.others_trim(quadrics_gt_scaled,points_input_scaled,quadrics_pre_scaled,"1",mesh_size,res,error,margin_pre,if_axis_trim,primitive_shape_pre,0,if_points_trim=if_points_trim)
+            
+        res,p_cover_1,p_cover_2 = self.res_efficient(points_reconstruction_shape_temp,points_input_scaled,DOWN_SAMPLE_NUM)
+
+        return points_reconstruction_shape_temp,res,p_cover_1,p_cover_2

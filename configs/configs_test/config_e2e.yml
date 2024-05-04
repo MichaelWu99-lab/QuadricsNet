@@ -1,19 +1,8 @@
 comment=""
 
 [train]
-model_path = "11_train_e2e_mode_{}_normalsInputFi-Fe_{}-{}-lamb0-1_{}_{}_{}_{}_{}-{}-{}-{}_cluIter_{}_bt_{}_lr_{}_knn_{}_knnStep_{}_more_{}"
 
-knn=80
-knn_step=2
-Q_size = 10
-num_primitives = 4
-d_mean = True
-d_scale = True
-last = "linear" 
-cluster_iterations = 5
-num_points=8000
-mode = 0
-
+# -------------------
 lamb_0_0 = 0.2
 lamb_0_1 = 0.2
 lamb_0_2 = 0.2
@@ -22,29 +11,56 @@ lamb_0_4 = 0.2
 lamb_0_5 = 0.2
 lamb_0_6 = 0.2
 lamb_1 = 0.1
+Q_size = 10
+
+num_primitives = 4
+
+d_mean = True
+d_scale = True
+
+last = "linear" 
+
+cluster_iterations = 5
 
 if_detection_normals = True
 # [sphere, plane, cylinder, cone]
-if_fitting_normals = 0,1,0,0
+if_fitting_normals = 0,1,1,1
 
-# Pre-trained model path
+# pre-trained model path
 fitting_model_path = "logs/pretrained_models/quadrics_fitting/"
 detection_model_path = "logs/pretrained_models/quadrics_detection/"
+# If you use retrained models, modify it
+# fitting_model_path = "logs/trained_models/*"
+# detection_model_path = "logs/trained_models/*"
 
-# Dataset path
-dataset_path = "demo/demo.h5"
-dataset_path_separately = "demo/"
+knn=80
+knn_step=2
+# -------------------
 
-batch_size = 12
+model_path = "14_train_e2e_mode_{}_normalsInputFi-Fe_{}-{}-lamb0-1_{}_{}_{}_{}_{}-{}-{}-{}_cluIter_{}_bt_{}_lr_{}_knn_{}_knnStep_{}_more_{}"
+
+#####run#####
+dataset_path = "data_resave_3k/quadrics_objects/test/test.h5"
+dataset_path_separately = "data_resave_3k/quadrics_objects/test/"
+
+batch_size = 4
 num_epochs = 100
 more = "run_pca_ABC"
-# Both num and rate are acceptable, priority rate
+# num and rate are acceptable, preferred quantity
 num_train=0
 num_val=0
 num_test=0
-# Be consistent with dection network
-rate_train=0
-rate_val=0
-rate_test=1
+# Must be consistent with confing_detection.yml
+rate_train=0.8
+rate_val=0.01
+rate_test=0.1
+#####end#####
 
+num_points=8000
+
+# Learing rate
 lr = 0.0001
+
+mode = 0
+
+

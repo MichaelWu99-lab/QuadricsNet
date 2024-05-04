@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch import linalg as LA
 
+from src.utils import quadrics_function_distance,taubin_distance
 
 from src.fitting_utils import remove_outliers, up_sample_all_in_range
 EPS = np.finfo(np.float32).eps
@@ -161,6 +162,8 @@ def fit_one_shape_torch(data, fitter, weights, eval=False,if_fitting_normals=[0,
 
             points_input = points
             normals_input = normals
+
+            T,_,_,_,_ = fitting(points_input, normals_input, primitives, if_fitting_normals,fitter,label_index,weight)
         else:
             weight = weights
 
@@ -179,70 +182,50 @@ def fit_one_shape_torch(data, fitter, weights, eval=False,if_fitting_normals=[0,
             points_input = points
             normals_input = normals
 
+            if primitives == 3:
+                diameter_ratio = compute_radius_ratio_torch(points_input)
+                if diameter_ratio < 2:
+                    primitives = torch.tensor(2).cuda(primitives.device)
+
             if primitives == 2:
                 _,_,_,points_input_cropped,normals_input_copped = estimate_cylinder_properties_torch(points_input,normals_input)
                 if points_input_cropped.shape[0] >= 100:
                     points_input = points_input_cropped
                     normals_input = normals_input_copped
-
-            _,index = remove_outliers(points_input.data.cpu().numpy())
-            points_input = points_input[index]
-            normals_input = normals_input[index]
-
-            num_points_input = 1100
-            points_input, normals_input = up_sample_all_in_range(points_input, normals_input, num_points_input)
-
-        points_mean = points_input.mean(dim=0)
-        points_input = points_input - points_mean
-
-        # {"Sphere":0,"Plane":1,"Cylinder":2,"Cone":3}
-        S, U = pca_torch(points_input)
-        S_sorted, index_sorted = torch.sort(S,descending=True)
-        U_sorted = U[:, index_sorted]
-        
-        if primitives == 1:
-            smallest_ev = U_sorted[:,2]
-            points_rotation = rotation_matrix_a_to_b_torch(smallest_ev, torch.tensor([1, 1, 1]).float().cuda(smallest_ev.device))
-        elif primitives == 3:
-            axis_shape = U_sorted[:,pca_judgment_torch(S_sorted,primitives)]
-            points_rotation = rotation_matrix_a_to_b_torch(axis_shape, torch.tensor([1, 1, 1]).float().cuda(axis_shape.device))
-        else:
-            axis_shape = U_sorted[:,pca_judgment_torch(S_sorted,primitives)]
-            points_rotation = rotation_matrix_a_to_b_torch(axis_shape, torch.tensor([1, 1, 1]).float().cuda(axis_shape.device))
-
-        points_input = (points_rotation @ points_input.T).T
-                        
-        points_std = torch.max(torch.sqrt(torch.sum(points_input ** 2, axis = 1)))
-        points_input = points_input / (points_std + EPS)
-
-        T = torch.diag(torch.tensor([1.0, 1.0, 1.0, 1.0])).cuda(points_input.device)
-        T_d = torch.diag(torch.tensor([1.0, 1.0, 1.0, 1.0])).cuda(points_input.device)
-        T_d[0:3, 3] = -points_mean
-        T = torch.matmul(T_d, T)
-        T_r = torch.diag(torch.tensor([1.0, 1.0, 1.0, 1.0])).cuda(points_input.device)
-        T_r[0:3,0:3] = points_rotation
-        T = torch.matmul(T_r, T)
-        T_s = torch.diag(torch.tensor([1 / (points_std + EPS), 1 / (points_std + EPS), 1 / (points_std + EPS), 1.0])).cuda(points_input.device)            
-        T = torch.matmul(T_s, T)
-
-        normals_input = torch.matmul(torch.inverse(T[0:3,0:3]).T , normals_input.T).T
-        normals_input = torch.divide(normals_input,torch.unsqueeze(torch.norm(normals_input,dim=1),axis=1))
-        for index_normals in range(normals_input.shape[0]):
-            if normals_input[index_normals][0] < 0:
-                normals_input[index_normals] = normals_input[index_normals] * (-1)
             
-        # sphere
-        if primitives == 0:
-            _,_,_ = fitter.forward_pass_sphere(points_input,normals_input, ids=label_index, weights = weight,if_fitting_normals=if_fitting_normals[0])
-        # plane
-        if primitives == 1:
-            _,_,_ = fitter.forward_pass_plane(points_input,normals_input,  ids=label_index, weights = weight,if_fitting_normals=if_fitting_normals[1])
-        # cylinder
-        if primitives == 2:
-            _,_,_ = fitter.forward_pass_cylinder(points_input,normals_input,  ids=label_index, weights = weight,if_fitting_normals=if_fitting_normals[2])
-        # cone
-        if primitives == 3:
-            _,_,_ = fitter.forward_pass_cone(points_input,normals_input,  ids=label_index, weights = weight,if_fitting_normals=if_fitting_normals[3])
+            ### Choosing optimality in variation ###
+            points_input_list = []
+            normals_input_list = []
+            T_list = []
+            fitter_parameters_list = []
+            dqf_monitor_list = []
+            dt_monitor_list = []
+            for _ in range(3):
+                # if primitives != 1:
+                _,index = remove_outliers(points_input.data.cpu().numpy())
+                points_input_temp = points_input[index]
+                normals_input_temp = normals_input[index]
+
+                num_points_input = 1100
+                points_input_temp, normals_input_temp = up_sample_all_in_range(points_input_temp, normals_input_temp, num_points_input)
+
+                T_temp,dqf_monitor,dt_monitor,points_input_temp,normals_input_temp = fitting(points_input_temp, normals_input_temp, primitives, if_fitting_normals,fitter,label_index,weight)
+
+                points_input_list.append(points_input_temp)
+                normals_input_list.append(normals_input_temp)
+                T_list.append(T_temp)
+                fitter_parameters_list.append(fitter.parameters[label_index])
+                dqf_monitor_list.append(dqf_monitor)
+                dt_monitor_list.append(dt_monitor)
+            
+            # optimal_index = dqf_monitor_list.index(min(dqf_monitor_list))
+            optimal_index = dt_monitor_list.index(min(dt_monitor_list))
+            # print(primitives,optimal_index,dt_monitor_list.index(min(dt_monitor_list)))
+            points_input = points_input_list[optimal_index]
+            normals_input = normals_input_list[optimal_index]
+            T = T_list[optimal_index]
+            fitter.parameters[label_index] = fitter_parameters_list[optimal_index]
+            #######
 
         clustered_points_input[label_index] = points_input
         clustered_normals_input[label_index] = normals_input
@@ -252,6 +235,62 @@ def fit_one_shape_torch(data, fitter, weights, eval=False,if_fitting_normals=[0,
         clustered_labels_gt[label_index] = label_gt
 
     return clustered_points,clustered_points_input,clustered_normals_input,clustered_Ts,clustered_primitives,clustered_primitives_gt,clustered_labels_gt
+
+def fitting(points_input, normals_input, primitives, if_fitting_normals,fitter,label_index,weight):
+
+    points_mean = points_input.mean(dim=0)
+    points_input = points_input - points_mean
+
+    # {"Sphere":0,"Plane":1,"Cylinder":2,"Cone":3}
+    S, U = pca_torch(points_input)
+    S_sorted, index_sorted = torch.sort(S,descending=True)
+    U_sorted = U[:, index_sorted]
+    
+    if primitives == 1:
+        smallest_ev = U_sorted[:,2]
+        points_rotation = rotation_matrix_a_to_b_torch(smallest_ev, torch.tensor([1, 1, 1]).float().cuda(smallest_ev.device))
+    else:
+        axis_shape = U_sorted[:,pca_judgment_torch(S_sorted,primitives)]
+        points_rotation = rotation_matrix_a_to_b_torch(axis_shape, torch.tensor([1, 1, 1]).float().cuda(axis_shape.device))
+
+    points_input = (points_rotation @ points_input.T).T
+                    
+    points_std = torch.max(torch.sqrt(torch.sum(points_input ** 2, axis = 1)))
+    points_input = points_input / (points_std + EPS)
+
+    T = torch.diag(torch.tensor([1.0, 1.0, 1.0, 1.0])).cuda(points_input.device)
+    T_d = torch.diag(torch.tensor([1.0, 1.0, 1.0, 1.0])).cuda(points_input.device)
+    T_d[0:3, 3] = -points_mean
+    T = torch.matmul(T_d, T)
+    T_r = torch.diag(torch.tensor([1.0, 1.0, 1.0, 1.0])).cuda(points_input.device)
+    T_r[0:3,0:3] = points_rotation
+    T = torch.matmul(T_r, T)
+    T_s = torch.diag(torch.tensor([1 / (points_std + EPS), 1 / (points_std + EPS), 1 / (points_std + EPS), 1.0])).cuda(points_input.device)            
+    T = torch.matmul(T_s, T)
+
+    normals_input = torch.matmul(torch.inverse(T[0:3,0:3]).T , normals_input.T).T
+    normals_input = torch.divide(normals_input,torch.unsqueeze(torch.norm(normals_input,dim=1),axis=1))
+    for index_normals in range(normals_input.shape[0]):
+        if normals_input[index_normals][0] < 0:
+            normals_input[index_normals] = normals_input[index_normals] * (-1)
+        
+    # sphere
+    if primitives == 0:
+        _,_,_ = fitter.forward_pass_sphere(points_input,normals_input, ids=label_index, weights = weight,if_fitting_normals=if_fitting_normals[0])
+    # plane
+    if primitives == 1:
+        _,_,_ = fitter.forward_pass_plane(points_input,normals_input,  ids=label_index, weights = weight,if_fitting_normals=if_fitting_normals[1])
+    # cylinder
+    if primitives == 2:
+        _,_,_ = fitter.forward_pass_cylinder(points_input,normals_input,  ids=label_index, weights = weight,if_fitting_normals=if_fitting_normals[2])
+    # cone
+    if primitives == 3:
+        _,_,_ = fitter.forward_pass_cone(points_input,normals_input,  ids=label_index, weights = weight,if_fitting_normals=if_fitting_normals[3])
+
+    dqf_monitor = quadrics_function_distance(fitter.parameters[label_index][1].squeeze(),points_input)
+    dt_monitor = taubin_distance(fitter.parameters[label_index][1].squeeze(),points_input)
+
+    return T,dqf_monitor,dt_monitor,points_input,normals_input
 
 def forward_sphere(input_points_,input_normals_, decoder, weights=None,if_fitting_normals=0):
 
@@ -347,13 +386,15 @@ def pca_judgment_torch(S,primitives):
             shape_axis_index = 0
     return shape_axis_index
 
-def estimate_cylinder_properties_torch(points,normals,k=4):
+def estimate_cylinder_properties_torch(points,normals,k=6):
     points_mean = torch.mean(points, dim=0)
     points_centered = points - points_mean
 
-    # PCA
-    u, s, v = torch.pca_lowrank(points_centered, q=3)
-    axis_direction = v[:, 0]
+    # # PCA
+    # u, s, v = torch.pca_lowrank(points_centered, q=3)
+    # axis_direction = v[:, 0]
+
+    axis_direction = find_axis_torch(points,"cylinder")
 
     projected_points = torch.matmul(points_centered, axis_direction)
     height = torch.max(projected_points) - torch.min(projected_points)
@@ -373,3 +414,42 @@ def estimate_cylinder_properties_torch(points,normals,k=4):
         normals_cropped = normals
 
     return axis_direction, height, radius, points_cropped, normals_cropped
+
+
+def compute_radius_ratio_torch(points, shape="cone"):
+
+    axis_shape = find_axis_torch(points, shape)
+
+    points_mean = torch.mean(points, dim=0)
+
+    # Calculate each point's projection onto the main axis
+    projections = torch.matmul(points - points_mean, axis_shape)
+
+    # Calculate distances
+    distances = torch.sqrt(torch.sum((points - points_mean) ** 2, dim=1) - projections ** 2)
+    radius_0 = torch.max(distances)
+    radius_1 = torch.min(distances)
+    diameter_ratio = radius_0 / radius_1
+
+    return diameter_ratio
+
+def find_axis_torch(points, shape="cone"):
+
+    mean = torch.mean(points, dim=0)
+    points = points - mean
+
+    S, U = pca_torch(points)
+    index_sorted = torch.argsort(-S)
+    S_sorted = S[index_sorted]
+    U_sorted = U[:, index_sorted]
+
+    if "plane" in shape:
+        smallest_ev = U_sorted[:, 2]
+        axis_shape = smallest_ev
+    elif "cone" in shape:
+        axis_shape = U_sorted[:, pca_judgment_torch(S_sorted, shape)]
+    else:
+        axis_shape = U_sorted[:, pca_judgment_torch(S_sorted, shape)]
+
+    return axis_shape
+

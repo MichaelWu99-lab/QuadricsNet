@@ -175,6 +175,24 @@ def up_sample_points_in_range(points, weights, a_min, a_max):
     weights = weights[L]
     return points, weights
 
+def up_sample_all_in_range_numpy(points, normals, a_max):
+    N = points.shape[0]
+    if N > a_max:
+        L = np.random.choice(np.arange(N), a_max, replace=False)
+        points = points[L]
+        normals = normals[L]
+        return points,normals
+    else:
+        while True:
+            points,normals = up_sample_all_numpy(points, normals)
+            if points.shape[0] >= a_max:
+                break
+    N = points.shape[0]
+    L = np.random.choice(np.arange(N), a_max, replace=False)
+    points = points[L]
+    normals = normals[L]
+    return points, normals
+
 def up_sample_all_in_range(points, normals, a_max):
     N = points.shape[0]
     if N > a_max:
@@ -216,3 +234,79 @@ def remove_outliers(points):
     cl, ind = pcd.remove_statistical_outlier(nb_neighbors=20,
                                              std_ratio=0.5)
     return np.array(cl.points),ind
+
+def up_sample_all_in_range_noNormals(points, a_max):
+    N = points.shape[0]
+    if N > a_max:
+        L = np.random.choice(np.arange(N), a_max, replace=False)
+        points = points[L]
+        return points
+    else:
+        while True:
+            points = up_sample_all_numpy_noNormals(points)
+            if points.shape[0] >= a_max:
+                break
+    N = points.shape[0]
+    L = np.random.choice(np.arange(N), a_max, replace=False)
+    points = points[L]
+    return points
+
+def up_sample_all_numpy_noNormals(points):
+    """
+    Upsamples points based on nearest neighbors using NumPy.
+    """
+    # 计算点与点之间的距离
+    dist = np.sum((np.expand_dims(points, axis=1) - np.expand_dims(points, axis=0)) ** 2, axis=2)
+
+    # 找到每个点的最近邻点
+    indices = np.argsort(dist, axis=1)[:, :10]
+    neighbors = points[indices[:, 1:]]
+
+    # 计算邻近点的中心
+    centers = np.mean(neighbors, axis=1)
+
+    # 将原始点和新计算的中心点合并
+    new_points = np.vstack([points, centers])
+
+    return new_points
+
+def up_sample_all_in_range_numpy(points, normals, a_max):
+    N = points.shape[0]
+    if N > a_max:
+        L = np.random.choice(np.arange(N), a_max, replace=False)
+        points = points[L]
+        normals = normals[L]
+        return points,normals
+    else:
+        while True:
+            points,normals = up_sample_all_numpy(points, normals)
+            if points.shape[0] >= a_max:
+                break
+    N = points.shape[0]
+    L = np.random.choice(np.arange(N), a_max, replace=False)
+    points = points[L]
+    normals = normals[L]
+    return points, normals
+
+import numpy as np
+
+def up_sample_all_numpy(points, normals):
+    # 计算点之间的距离矩阵
+    dist = np.sum((points[:, np.newaxis, :] - points[np.newaxis, :, :]) ** 2, axis=2)
+
+    # 找到每个点的最近的10个邻居
+    indices = np.argsort(dist, axis=1)[:, 1:11]  # 跳过自身，取最近的10个邻居
+
+    # 获取邻居点
+    neighbors = points[indices[:, 1:]]  # 跳过最近的（自身），取其它邻居
+
+    # 计算每组邻居的中心点
+    centers = np.mean(neighbors, axis=1)
+
+    # 合并原始点和新计算的中心点
+    new_points = np.concatenate([points, centers], axis=0)
+    new_normals = np.concatenate([normals, normals], axis=0)
+
+    return new_points, new_normals
+
+

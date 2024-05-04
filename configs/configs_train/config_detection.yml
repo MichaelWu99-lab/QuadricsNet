@@ -1,0 +1,52 @@
+comment=""
+
+[train]
+
+# -------------------
+Q_size = 10
+num_primitives = 4
+d_mean = True
+d_scale = True
+d_rotation = True # invalid
+cluster_iterations = 5 # invalid
+if_normals = True
+last = "linear" 
+knn = 80
+knn_step = 2
+# -------------------
+
+model_path = "12_train_feature_mode_{}_normalsInput_{}_bt_{}_lr_{}_knn_{}_knnStep_{}_more_{}"
+
+# # debug
+# dataset_path = "data_quadrics/multShape/quadrics_100_withoutCone_normals.h5"
+# batch_size = 2
+# num_epochs = 1
+# more = "debug"
+
+# run
+# dataset_path = "data_quadrics/multShape/quadrics_10000_withoutCone_normals.h5"
+dataset_path = "data/quadrics_objects/train/train.h5"
+batch_size = 24
+num_epochs = 100
+more = "run_ABC_1"
+
+# Whether to load a pretrained model or not
+preload_model = False
+
+# 数量和比例均可，优先数量
+num_train=0
+num_val=0
+num_test=0
+rate_train=0.8
+rate_val=0.04
+rate_test=0.04
+
+num_points=8000
+
+
+# Optimization
+optim = adam
+
+mode = 0
+
+lr = 0.001

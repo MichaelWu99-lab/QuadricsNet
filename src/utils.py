@@ -93,7 +93,7 @@ def rescale_input_outputs_quadrics(T_batch, scale_quadrics,quadrics, output,batc
         else:
             quadrics_d_T = torch.cat((quadrics_d_T,quadrics_d_T_each.unsqueeze(0)),0)
             output_d_T = torch.cat((output_d_T,output_d_T_each.unsqueeze(0)),0)
-    return T_batch, quadrics_d_T, output_d_T
+    return quadrics_d_T, output_d_T
 
 
 def grad_norm(model):
@@ -109,6 +109,13 @@ def q_Q(q):
                         [q[3], q[1], q[5], q[7]],
                         [q[4], q[5], q[2], q[8]],
                         [q[6], q[7], q[8], q[9]]]).cuda(q.device)
+    return Q
+
+def q_Q_numpy(q):
+    Q = np.array([[q[0], q[3], q[4], q[6]],
+                [q[3], q[1], q[5], q[7]],
+                [q[4], q[5], q[2], q[8]],
+                [q[6], q[7], q[8], q[9]]])
     return Q
 
 def Q_q(Q):
@@ -141,8 +148,8 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
                                     [q_pre[3], q_pre[1], q_pre[5], q_pre[7]],
                                     [q_pre[4], q_pre[5], q_pre[2], q_pre[8]],
                                     [q_pre[6], q_pre[7], q_pre[8], q_pre[9]]]).cuda(q_pre.device)
-            Q_gt,_ = quadrics_scale_identification(Q_gt)
-            Q_pre,_ = quadrics_scale_identification(Q_pre)
+            Q_gt,_ = quadrics_scale_identification(Q_gt,shape)
+            Q_pre,_ = quadrics_scale_identification(Q_pre,shape)
         
         elif shape in ["plane","cone","elliptic_cone"]:
 
@@ -164,7 +171,7 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
                                     [q_gt[3], q_gt[1], q_gt[5], q_gt[7]],
                                     [q_gt[4], q_gt[5], q_gt[2], q_gt[8]],
                                     [q_gt[6], q_gt[7], q_gt[8], q_gt[9]]]).cuda(q_gt.device)
-            _,scale_identification_gt = quadrics_scale_identification(Q_gt)
+            _,scale_identification_gt = quadrics_scale_identification(Q_gt,shape)
             Is_add = 1
         elif shape in ["plane","cone","elliptic_cone"]:
             Q_gt = torch.tensor([[q_gt[0], q_gt[3], q_gt[4], q_gt[6]],
@@ -174,7 +181,6 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
             scale_identification_gt = 0
             Is_add = 0
 
-        
     ###########################
     # trans_inv=[R.T, -R.T*t
     #             0  ,  1  ]
@@ -215,15 +221,28 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
     value_pre_sorted = torch.diag_embed(value_pre_sorted).cuda(q_gt.device)
 
     ###########################
+    # if (shape in ["cone","elliptic_cone"]) and eval:
+    #     if sum(torch.diag(value_gt_sorted) < 0) == 1:
+    #         factor_gt = -value_gt_sorted[value_gt_sorted < 0]
+    #         value_gt_sorted = value_gt_sorted / factor_gt
+    #         scale_gt_sorted = scale_gt_sorted * torch.sqrt(factor_gt)
+    #         Q_gt = Q_gt / factor_gt
+
+    #     if sum(torch.diag(value_pre_sorted) < 0) == 1:
+    #         factor_pre = -value_pre_sorted[value_pre_sorted < 0]
+    #         value_pre_sorted = value_pre_sorted / factor_pre
+    #         scale_pre_sorted = scale_pre_sorted * torch.sqrt(factor_pre)
+    #         Q_pre = Q_pre / factor_pre
+    #         trans_t = trans_t / factor_pre
+
     if (shape in ["cone","elliptic_cone"]) and eval:
         if sum(torch.diag(value_gt_sorted) < 0) == 1:
             factor_gt = -value_gt_sorted[value_gt_sorted < 0]
-            value_gt_sorted = value_gt_sorted / factor_gt
-            Q_gt = Q_gt / factor_gt
+            scale_gt_sorted = scale_gt_sorted * torch.sqrt(factor_gt)
 
         if sum(torch.diag(value_pre_sorted) < 0) == 1:
             factor_pre = -value_pre_sorted[value_pre_sorted < 0]
-            value_pre_sorted = value_pre_sorted / factor_pre
+            scale_pre_sorted = scale_pre_sorted * torch.sqrt(factor_pre)
 
     ###########################
     # ldr
@@ -242,8 +261,8 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
         loss_decomposition_s = torch.sum(Is_gt)
     else:
         if not eval:
-            loss_decomposition_s = torch.sum(((value_gt_sorted - value_pre_sorted)**2))
-            loss_decomposition_s = loss_decomposition_s + ((C_pre[3,3] + scale_identification_gt)) ** 2
+            loss_decomposition_s = torch.sum(torch.abs(value_gt_sorted - value_pre_sorted))
+            loss_decomposition_s = loss_decomposition_s + torch.abs(C_pre[3,3] + scale_identification_gt)
             loss_decomposition_s = loss_decomposition_s/(torch.count_nonzero(value_gt_sorted)+Is_add)
         elif eval:
             loss_decomposition_s = torch.sum((torch.matmul((scale_gt_sorted - scale_pre_sorted),torch.diag_embed(Is_gt))**2))/torch.sum(Is_gt)
@@ -260,12 +279,14 @@ def quadrics_decomposition_distance(output, quadrics,trans_inv,C,eval=False,shap
 
     return loss_decomposition_r,loss_decomposition_s,loss_decomposition_t
 
-def quadrics_scale_identification(Q):
+def quadrics_scale_identification(Q,shape):
     eigenvalue_Q,_ = torch.eig(Q,eigenvectors=False)
     eigenvalue_Q = eigenvalue_Q[:,0]
 
-    eigenvalue_Q_sum = torch.sum(torch.abs(eigenvalue_Q))
-    eigenvalue_Q = eigenvalue_Q[torch.where(torch.abs(eigenvalue_Q) > (eigenvalue_Q_sum * 0.001))]
+    if shape in ["cylinder","elliptic_cylinder"]:
+        min_abs_index = torch.argmin(torch.abs(eigenvalue_Q))
+        # 删除该元素
+        eigenvalue_Q = torch.cat((eigenvalue_Q[:min_abs_index], eigenvalue_Q[min_abs_index + 1:]))
 
     scale_Q = torch.tensor([1]).cuda(Q.device)
     for i in eigenvalue_Q:
@@ -274,8 +295,13 @@ def quadrics_scale_identification(Q):
     eigenvalue_E,_ = torch.eig(Q[0:3,0:3],eigenvectors=False)
     eigenvalue_E = eigenvalue_E[:,0]
 
-    eigenvalue_E_sum = torch.sum(torch.abs(eigenvalue_E))
-    eigenvalue_E = eigenvalue_E[torch.where(torch.abs(eigenvalue_E) > (eigenvalue_E_sum * 0.001))]
+    if shape in ["cylinder","elliptic_cylinder"]:
+        # eigenvalue_E = eigenvalue_E[np.where(np.abs(eigenvalue_E) > (eigenvalue_E_sum * 0.01))]
+        # 找到绝对值最小的元素的索引
+        min_abs_index = torch.argmin(torch.abs(eigenvalue_E))
+        # 删除该元素
+        eigenvalue_E = torch.cat((eigenvalue_E[:min_abs_index], eigenvalue_E[min_abs_index + 1:]))
+
     scale_E = torch.tensor([1]).cuda(Q.device)
 
     for i in eigenvalue_E:
@@ -297,12 +323,43 @@ def quadrics_function_distance(output, points):
     append_one = append_one.cuda(device=points.device)
     points_append = torch.cat((points, append_one), 1)
 
-    # distance_quadrics_function = mean(x*Q*xT)
-    distance_quadrics_function = torch.matmul(torch.matmul(points_append, Q), points_append.transpose(1, 0)).pow(2)
-    distance_quadrics_function = torch.mean(distance_quadrics_function)
+
+    # X_reshaped = points_append.view(points_append.shape[0], 1, points_append.shape[1])  # 调整为 (10000, 1, 4)
+    # XQ = torch.bmm(X_reshaped, Q.unsqueeze(0).expand(X_reshaped.size(0), *Q.size()))
+    # X_transpose = points_append.view(points_append.shape[0], points_append.shape[1], 1)  # 调整为 (10000, 4, 1)
+    # result = torch.bmm(XQ, X_transpose)
+    # result = result.squeeze(2)
+
+    distance_quadrics_function = torch.mean(torch.einsum('ij,jk,ki->i', points_append, Q, points_append.T).pow(2))
+
+    # # distance_quadrics_function = mean(x*Q*xT)
+    # distance_quadrics_function = torch.matmul(torch.matmul(points_append, Q), points_append.transpose(1, 0)).pow(2)
+    # distance_quadrics_function = torch.mean(distance_quadrics_function)
 
     return distance_quadrics_function
 
+
+def taubin_distance(output, points):
+    q = output
+
+    Q = torch.tensor([[q[0], q[3], q[4], q[6]],
+                                [q[3], q[1], q[5], q[7]],
+                                [q[4], q[5], q[2], q[8]],
+                                [q[6], q[7], q[8], q[9]]]).cuda(device=points.device)
+
+    append_one = torch.ones(points.size(0), 1)
+    append_one = append_one.cuda(points.device)
+    points_append = torch.cat((points, append_one), 1)
+
+    # x*Q*xT
+    quadrics_function_each = torch.einsum('ij,jk,ki->i', points_append, Q, points_append.T).pow(2)
+    deta_function_each = torch.norm(compute_normals_analytically_torch(points,q,if_normalize=False),dim=1,p=2).pow(2)
+    distance_taubin = quadrics_function_each / (deta_function_each + 1e-8)
+
+    distance_taubin = torch.mean(distance_taubin)
+
+    return distance_taubin
+    
 def normals_deviation_distance(output,points,normals,quadrics):
 
     normals_analytical = compute_normals_analytically_torch(points,output)
@@ -310,7 +367,7 @@ def normals_deviation_distance(output,points,normals,quadrics):
 
     return loss_normals_deviation
 
-def compute_normals_analytically_torch(points_temp,quadrics_temp):
+def compute_normals_analytically_torch(points_temp,quadrics_temp,if_normalize=True):
     untils_zeros = torch.zeros([points_temp.shape[0],1]).cuda(device=points_temp.device)
     untils_ones = torch.ones([points_temp.shape[0],1]).cuda(device=points_temp.device)
     untils_points_x = torch.unsqueeze(points_temp[:,0],axis=-1)
@@ -328,7 +385,8 @@ def compute_normals_analytically_torch(points_temp,quadrics_temp):
     deta_v = torch.cat((deta_v_0,deta_v_1,deta_v_2),axis=1)
     normlas_temp = torch.squeeze(torch.matmul(deta_v,torch.unsqueeze(quadrics_temp,axis=-1)),2)
 
-    normlas_temp = torch.nn.functional.normalize(normlas_temp,p=2, dim=1)
+    if if_normalize:
+        normlas_temp = torch.nn.functional.normalize(normlas_temp,p=2, dim=1)
 
     return normlas_temp
 
@@ -366,33 +424,35 @@ def rescale_input_outputs_quadrics_e2e(T_batch,T_batch_sample, scale_quadrics_ba
 
 def quadrics_judgment(eigenvalue):
 
-    margin = 1e-5
+    margin_0 = 1e-3
+    margin_1 = 1e-2
+
     x = eigenvalue[1]/eigenvalue[0]
     y = eigenvalue[2]/eigenvalue[0]
 
     # translation degeneration
-    It = (torch.abs(eigenvalue)>margin).float().cuda(eigenvalue.device)
+    It = (torch.abs(eigenvalue)>margin_0).float().cuda(eigenvalue.device)
 
     # scale degeneration
     Is = It
 
     # in case of plane [1 0 0 0]
-    if torch.abs(x) < margin and torch.abs(y) < margin:
+    if torch.abs(x) < margin_0 and torch.abs(y) < margin_0:
         Is = torch.tensor([0,0,0]).float().cuda(eigenvalue.device)
     # in case of cylinder [1 1 0 -1]
-    if x > margin and torch.abs(y) < margin:
+    if x > margin_0 and torch.abs(y) < margin_0:
         Is = torch.tensor([1,1,0]).float().cuda(eigenvalue.device)
     # in case of cone [1 1 -1 0]
-    if x > margin and y < -margin:
+    if x > margin_0 and y < -margin_0:
         Is = torch.tensor([1,1,0]).float().cuda(eigenvalue.device)
 
     # rotation degeneration
     Ir = torch.ones(3).cuda(eigenvalue.device)
 
-    if torch.abs(x - 1) < margin:
+    if torch.abs(x - 1) < margin_1:
         Ir[1] = 0
         Ir[0] = 0
-    if torch.abs(x-y) < margin:
+    if torch.abs(x - y) < margin_1:
         Ir[1] = 0
         Ir[2] = 0
     

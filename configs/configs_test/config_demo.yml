@@ -1,0 +1,60 @@
+comment=""
+
+[train]
+
+# -------------------
+lamb_0_0 = 0.2
+lamb_0_1 = 0.2
+lamb_0_2 = 0.2
+lamb_0_3 = 0.2
+lamb_0_4 = 0.2
+lamb_0_5 = 0.2
+lamb_0_6 = 0.2
+lamb_1 = 0.1
+Q_size = 10
+
+num_primitives = 4
+
+d_mean = True
+d_scale = True
+
+last = "linear" 
+
+cluster_iterations = 5
+
+if_detection_normals = True
+# [sphere, plane, cylinder, cone]
+if_fitting_normals = 0,1,1,1
+
+# pre-trained model path
+fitting_model_path = "logs/pretrained_models/quadrics_fitting/"
+detection_model_path = "logs/pretrained_models/quadrics_detection/"
+
+knn=80
+knn_step=2
+# -------------------
+
+model_path = "14_train_e2e_mode_{}_normalsInputFi-Fe_{}-{}-lamb0-1_{}_{}_{}_{}_{}-{}-{}-{}_cluIter_{}_bt_{}_lr_{}_knn_{}_knnStep_{}_more_{}"
+
+dataset_path = "demo/demo.h5"
+dataset_path_separately = "demo/"
+
+batch_size = 4
+num_epochs = 100
+more = "run_pca_ABC"
+# num and rate are acceptable, preferred quantity
+num_train=0
+num_val=0
+num_test=0
+rate_train=0
+rate_val=0
+rate_test=1
+
+num_points=8000
+
+# Learing rate
+lr = 0.0001
+
+mode = 0
+
+
