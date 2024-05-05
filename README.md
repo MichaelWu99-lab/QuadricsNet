@@ -4,7 +4,7 @@
 
 This repository contains the official PyTorch implementation of the [QuadricsNet](https://arxiv.org/pdf/2309.14211.pdf) paper.
 
-[Paper](https://arxiv.org/pdf/2309.14211.pdf) | [Video](https://www.youtube.com/watch?v=0EFhMufuUSI) | Data ([Google Drive](https://drive.google.com/file/d/1toRuKRauOkjEfmZeH2EovYTNeNY_nRJ0/view?usp=drive_link), [Baidu Drive](https://pan.baidu.com/s/1OMnOz8jiSUOyGEC9iTSaSg?pwd=lyou))
+[Paper](https://arxiv.org/pdf/2309.14211.pdf) | [Video](https://www.youtube.com/watch?v=0EFhMufuUSI)
 
 # Introduction
 QuadricsNet is an end-to-end framework to learn a concise representation with only 10 parameters for diverse geometric primitives in 3D point clouds. Experiments of primitive parsing on the collected dataset and structure mapping on real-world scenes demonstrate that the quadrics representation is effective and the QuadricsNet framework is robust.
@@ -46,7 +46,7 @@ python test_e2e_vis.py configs/configs_test/config_demo.yml 40000 # 40000 is the
 ```
 
 # Dataset
-The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/d/1toRuKRauOkjEfmZeH2EovYTNeNY_nRJ0/view?usp=drive_link) or [Baidu Drive](https://pan.baidu.com/s/1OMnOz8jiSUOyGEC9iTSaSg?pwd=lyou).
+The Quadrics dataset is available: [Google Drive](https://drive.google.com/file/d/1Hrocs6T9koVm5Ntn_5u1DQJE5AbGmJjI/view?usp=drive_link) or [Baidu Drive](https://pan.baidu.com/s/1gb_MbKMyEEb0cjxuE2AzlA?pwd=q130).
 <!-- Download this dataset and unzip it into **QuadricsNet/** folder. -->
 * The file structure is as follows:
 ```

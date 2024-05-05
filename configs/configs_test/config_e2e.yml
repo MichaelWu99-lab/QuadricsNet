@@ -40,8 +40,8 @@ knn_step=2
 model_path = "14_train_e2e_mode_{}_normalsInputFi-Fe_{}-{}-lamb0-1_{}_{}_{}_{}_{}-{}-{}-{}_cluIter_{}_bt_{}_lr_{}_knn_{}_knnStep_{}_more_{}"
 
 #####run#####
-dataset_path = "data_resave_3k/quadrics_objects/test/test.h5"
-dataset_path_separately = "data_resave_3k/quadrics_objects/test/"
+dataset_path = "data/quadrics_objects/test/test.h5"
+dataset_path_separately = "data/quadrics_objects/test/"
 
 batch_size = 4
 num_epochs = 100
